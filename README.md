@@ -32,7 +32,7 @@ AntiFi is an open-source wireless security assessment tool built on the ESP32 pl
 - Authorized penetration testing in controlled environments
 
 **Version**: 1.0  
-**Release Date**: 2024  
+**Release Date**: 2025  
 **Platform**: ESP32 (Arduino Framework)  
 **License**: MIT
 
@@ -54,7 +54,7 @@ AntiFi is an open-source wireless security assessment tool built on the ESP32 pl
 - Network vulnerability analysis
 - Encryption type detection (WEP, WPA, WPA2, WPA3)
 
-#### 3. **Educational Demonstration Module**
+#### 3. **Evil Portal Module**
 - Captive portal implementation
 - Multiple portal types (WiFi, Google, Microsoft, Apple, Facebook)
 - Credential capture simulation (for educational purposes)
@@ -112,7 +112,7 @@ AntiFi is an open-source wireless security assessment tool built on the ESP32 pl
    - Go to **Tools → Board → Boards Manager**
    - Search for "esp32"
    - Install "ESP32 by Espressif Systems"
-   - Select version 2.0.0 or higher
+   - Select version 2.0.10
 
 ### Project Setup
 
@@ -298,7 +298,7 @@ Initiates a deauthentication attack.
 - `-s <source>`: Source MAC address (AP BSSID)
 - `-t <target>`: Target MAC address (client MAC)
 - `-c <channel>`: WiFi channel (1-14)
-- `-p <pps>`: Packets per second (1-100)
+- `-p <pps>`: Packets per second (1-1000)
 
 **Example:**
 ```
@@ -382,7 +382,7 @@ Displays current system status including:
 - Performance statistics
 
 #### `creds`
-Displays credentials captured by captive portals (for educational review).
+Displays credentials captured by captive portals.
 
 #### `clear`
 Clears all stored credentials and session data.
