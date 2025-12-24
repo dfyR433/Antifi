@@ -146,7 +146,6 @@ antifi> stop                     # Stop all operations
 - **Issues**: [GitHub Issues](https://github.com/dfyR433/AntiFi/issues)
 - **Binary Downloads**: [Releases Page](https://github.com/dfyR433/AntiFi/releases)
 - **Source Code**: [GitHub Repository](https://github.com/dfyR433/AntiFi)
-- **Documentation**: See `docs/` folder in repository
 
 ## License
 
