@@ -5,6 +5,10 @@
 ![License](https://img.shields.io/badge/License-MIT-orange)
 ![Binary](https://img.shields.io/badge/Pre--compiled-Binary_Available-green)
 
+<p align="center">
+  <img src="img/Antifi.jpg" alt="Antifi" width="200"/>
+</p>
+
 ## Overview
 
 AntiFi is an educational ESP32-based tool for authorized WiFi security research and penetration testing. Built with Arduino IDE, this project demonstrates wireless security concepts in controlled environments.
