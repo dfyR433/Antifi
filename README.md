@@ -1,13 +1,13 @@
 # AntiFi - WiFi Security Research Tool
 
+<p align="center">
+  <img src="img/Antifi.png" alt="Antifi" width="600"/>
+</p>
+
 ![Version](https://img.shields.io/badge/Version-1.0-blue)
 ![Platform](https://img.shields.io/badge/Platform-ESP32-green)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 ![Binary](https://img.shields.io/badge/Pre--compiled-Binary_Available-green)
-
-<p align="center">
-  <img src="img/Antifi.png" alt="Antifi" width="600"/>
-</p>
 
 ## Overview
 
