@@ -6,7 +6,7 @@
 ![Binary](https://img.shields.io/badge/Pre--compiled-Binary_Available-green)
 
 <p align="center">
-  <img src="img/Antifi.jpg" alt="Antifi" width="200"/>
+  <img src="img/Antifi.png" alt="Antifi" width="200"/>
 </p>
 
 ## Overview
