@@ -7,8 +7,8 @@
 #include <array>
 
 // ===== Configuration Constants =====
-#define MAX_APS 200           // Maximum number of APs to store
-#define MAX_CLIENTS 500       // Maximum number of clients to store
+#define MAX_APS 100           // Maximum number of APs to store
+#define MAX_CLIENTS 300       // Maximum number of clients to store
 #define MAX_SSID_HISTORY 20   // Store recent SSIDs per client
 #define MAX_PROBE_CACHE 50    // Maximum probe requests to cache
 

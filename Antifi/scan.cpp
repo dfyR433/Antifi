@@ -38,7 +38,7 @@ unsigned long channel_switch_time = 0;
 
 // ===== Configuration =====
 const int CHANNEL_SWITCH_INTERVAL = 300;
-const int TOTAL_CHANNELS = 13;
+const int TOTAL_CHANNELS = 14;
 const int MAX_CLIENT_AGE_MS = 30000;
 const int CLIENT_CLEANUP_INTERVAL = 5000;
 const int MINIMUM_RSSI = -90;
@@ -1647,7 +1647,7 @@ void displayEnhancedAPs() {
         if (ap.ssid_revealed) hidden_revealed_count++;
         
         // Limit display to 25 APs at once
-        if (displayed_count >= 25) {
+        if (displayed_count >= 50) {
             Serial.println("... more APs not displayed ...");
             break;
         }
@@ -1754,7 +1754,7 @@ void displayClients() {
         active_clients++;
         
         // Limit display
-        if (displayed >= 15) {
+        if (displayed >= 100) {
             Serial.println("... more clients not displayed ...");
             break;
         }

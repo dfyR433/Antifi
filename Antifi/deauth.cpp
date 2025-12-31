@@ -4,11 +4,6 @@
 #include "esp_wifi.h"
 #include "deauth.h"
 
-// ===== Hack to bypass sanity check ======
-extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
-  return 0;
-}
-
 // ===== Global Config =====
 static bool deauth_wifi_initialized = false;
 
