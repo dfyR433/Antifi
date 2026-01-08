@@ -43,7 +43,7 @@ Open Serial Monitor at **115200 baud**:
 ║   send<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                             ║
 ║     Example: send1 -i 00:00:00 -ch 6 -pps 100 -m 1000                            ║
 ║     -i: Packet data in hex (space-separated bytes)                               ║
-║     -ch: Channel 1-13                                                            ║
+║     -ch: Channel 1-14                                                            ║
 ║     -pps: Packets per second                                                     ║
 ║     -m: Max packets or 'non' for unlimited                                       ║
 ║   listsenders                List all active packet senders                      ║
