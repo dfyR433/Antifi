@@ -1,4 +1,4 @@
-# AntiFi - WiFi Security Tool
+# AntiFi - WiFi Pentesting Tool
 
 <p align="center">
   <img src="img/Antifi.png" alt="Antifi" width="500"/>
@@ -7,9 +7,15 @@
 ## Overview
 AntiFi is an ESP32-based WiFi security testing platform for **penetration testing and security education**.
 
-## Quick Start
+## Features
+- **Network scanning**
+- **Beacon flood**
+- **Deauthentication**
+- **Captive portals**
+- **Packet injection**
 
-### Flash Pre-Built Binary
+## Quick Start
+Flash Pre-Built Binary
 ```bash
 # Install esptool
 pip install esptool
@@ -32,13 +38,6 @@ antifi> scan -t sta             # Find connected devices
 antifi> beacon -s               # Start beacon flood demo
 antifi> stop                    # Stop everything
 ```
-
-## Features
-- **Network scanning**
-- **Beacon flood**
-- **Deauthentication**
-- **Captive portals**
-- **Packet injection**
 
 ## Support
 - **Issues**: GitHub Issues page
