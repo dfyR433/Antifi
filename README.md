@@ -54,9 +54,6 @@ Open Serial Monitor at **115200 baud**:
 ║ DEAUTH ATTACK:                                                                   ║
 ║   deauth -s <src mac> -t <tgt mac> -c <channel> -p <packets per second>          ║
 ║                                                                                  ║
-║ DEAUTH ATTACK:                                                                   ║
-║   deauth -s <src mac> -t <tgt mac> -c <channel> -p <packets per second>          ║
-║                                                                                  ║
 ║ CAPTIVE PORTAL:                                                                  ║
 ║   captive_portal -s <ssid> -p <pass> -t <type> -m <mac> -e <encryption>          ║
 ║     Types: wifi, google, microsoft, apple, facebook                              ║
