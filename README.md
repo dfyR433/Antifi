@@ -26,16 +26,24 @@
 ### Flash Pre-Built Binary
 
 ```bash
-# Install esptool
 pip install esptool
 
-# Flash to ESP32 (change port and file paths as needed)
-esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
-  --before default_reset --after hard_reset \
-  erase_flash write_flash -z \
-  0x1000 Antifi.bootloader.bin \
-  0x8000 Antifi.partition-table.bin \
-  0x10000 Antifi.bin
+esptool \
+  --chip esp32 \
+  --port COM3 \
+  --baud 921600 \
+  --before default-reset \
+  --after hard-reset \
+  erase-flash
+
+esptool \
+  --chip esp32 \
+  --port COM3 \
+  --baud 921600 \
+  write-flash -z \
+  0x1000  Antifi.esp32.bootloader.bin \
+  0x8000  Antifi.esp32.partitions.bin \
+  0x10000 Antifi.esp32.bin
 ```
 
 ---
