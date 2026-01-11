@@ -1,26 +1,35 @@
-# AntiFi - WiFi Pentesting Tool
+# AntiFi – Wi-Fi Pentesting Tool
 
 <p align="center">
-  <img src="img/Antifi.png" alt="Antifi" width="400"/>
+  <img src="img/Antifi.png" alt="AntiFi Logo" width="400"/>
 </p>
 
 ## Overview
-AntiFi is an ESP32-based WiFi security testing platform for **penetration testing and security education**.
+
+**AntiFi** is an ESP32-based Wi-Fi penetration testing and security research platform that provides **full low-level control** for **penetration testers, learners, and researchers**.
+
+---
 
 ## Features
-- **Network scanning**
-- **Beacon flood**
-- **Deauthentication**
-- **Captive portals**
-- **Packet injection**
+
+* **Network scanning** (APs & clients)
+* **Beacon flood attacks** (1.3k SSIDs)
+* **Deauthentication attacks** (Adjustable packet rate & channel)
+* **Captive portals** (Multiple portal templates)
+* **Raw packet injection** (Send custom 802.11 frames)
+* **Serial-based command interface** (CLI over UART)
+
+---
 
 ## Quick Start
-Flash Pre-Built Binary
+
+### Flash Pre-Built Binary
+
 ```bash
 # Install esptool
 pip install esptool
 
-# Flash to ESP32 (change COM3 to your port & bin files paths)
+# Flash to ESP32 (change port and file paths as needed)
 esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
   --before default_reset --after hard_reset \
   erase_flash write_flash -z \
@@ -29,9 +38,13 @@ esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
   0x10000 Antifi.bin
 ```
 
+---
+
 ## Commands
-Open Serial Monitor at **115200 baud**:
-```bash
+
+Open a serial monitor at **115200 baud**:
+
+```text
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                               ANTIFI COMMAND HELP                                ║
 ╠══════════════════════════════════════════════════════════════════════════════════╣
@@ -75,14 +88,17 @@ Open Serial Monitor at **115200 baud**:
 ╚══════════════════════════════════════════════════════════════════════════════════╝
 ```
 
-## Support
-- **Issues**: GitHub Issues page
-- **Binaries**: Releases page
-- **Source**: GitHub repository
+---
 
-## License
-MIT License - For educational use only.
+## Support
+
+* **Issues**: GitHub Issues
+* **Binaries**: GitHub Releases
+* **Source Code**: GitHub Repository
 
 ---
 
-**Use responsibly. Only test networks you own.**
+## License
+
+**MIT License**
+For **educational and authorized security testing only**.
