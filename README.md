@@ -1,7 +1,7 @@
 # AntiFi - WiFi Pentesting Tool
 
 <p align="center">
-  <img src="img/Antifi.png" alt="Antifi" width="500"/>
+  <img src="img/Antifi.png" alt="Antifi" width="400"/>
 </p>
 
 ## Overview
