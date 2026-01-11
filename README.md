@@ -81,7 +81,7 @@ Open a serial monitor at **115200 baud**:
 ║                                                                                  ║
 ║ NOTES:                                                                           ║
 ║   • Use '' for empty password (two single quotes)                                ║
-║   • Packet data must be in hex format (e.g., 08:00:27:AA:BB:CC)                  ║
+║   • Packet data must be in hex format (e.g., ff ff ff ff ff ff)                  ║
 ║   • Sender names must be 'send' followed by a number (e.g., send1, send2)        ║
 ║   • Maximum packet size: 512 bytes                                               ║
 ║                                                                                  ║
