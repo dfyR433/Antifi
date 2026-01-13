@@ -9,7 +9,7 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
 injectorManager injectorManager;
 int currentChannel = 1;
 String inputBuffer = "";
-const int led = 15;
+const int led = 2;
 const char* version = "v1.0";
 
 typedef struct {
