@@ -61,13 +61,13 @@ Open a serial monitor at **115200 baud**:
 ║   scan -t sta                 Scan for WiFi clients (Stations)                   ║
 ║                                                                                  ║
 ║ PACKET INJECTION:                                                                ║
-║   send<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                             ║
-║     Example: send1 -i 00:00:00 -ch 6 -pps 100 -m 1000                            ║
+║   inject<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                           ║
+║     Example: inject0 -i 00 00 00 -ch 6 -pps 100 -m 1000                          ║
 ║     -i: Packet data in hex (space-separated bytes)                               ║
 ║     -ch: Channel 1-13                                                            ║
 ║     -pps: Packets per second                                                     ║
 ║     -m: Max packets or 'non' for unlimited                                       ║
-║   listsenders                List all active packet senders                      ║
+║   list_injectors                List all active packet injectors                 ║
 ║                                                                                  ║
 ║ BEACON ATTACK:                                                                   ║
 ║   beacon -s                  Start beacon spam attack                            ║
@@ -89,7 +89,7 @@ Open a serial monitor at **115200 baud**:
 ║                                                                                  ║
 ║ NOTES:                                                                           ║
 ║   • Use '' for empty password (two single quotes)                                ║
-║   • Packet data must be in hex format (e.g., ff ff ff ff ff ff)                  ║
+║   • Packet data must be in hex format (e.g., 08 00 27 AA BB CC)                  ║
 ║   • Sender names must be 'send' followed by a number (e.g., send1, send2)        ║
 ║   • Maximum packet size: 512 bytes                                               ║
 ║                                                                                  ║
