@@ -39,7 +39,7 @@ void showHelp() {
                    "║     -ch: Channel 1-13                                                            ║\n"
                    "║     -pps: Packets per second                                                     ║\n"
                    "║     -m: Max packets or 'non' for unlimited                                       ║\n"
-                   "║   list_injectors                List all active packet senders                   ║\n"
+                   "║   list_injectors                List all active packet injectors                 ║\n"
                    "║                                                                                  ║\n"
                    "║ BEACON ATTACK:                                                                   ║\n"
                    "║   beacon -s                  Start beacon spam attack                            ║\n"
