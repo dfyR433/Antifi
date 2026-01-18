@@ -12,12 +12,13 @@
 
 ## Features
 
-* **Network scanning** (APs & clients)
-* **Beacon flood attacks** (1.3k SSIDs)
-* **Deauthentication attacks** (Adjustable packet rate & channel)
-* **Captive portals** (Multiple portal templates)
-* **Raw packet injection** (Send custom 802.11 frames)
-* **Serial-based command interface** (CLI over UART)
+* **Wi‑Fi Monitoring** (Passive 802.11 frame sniffing with PCAPNG output)
+* **Network Scanning** (APs & clients)
+* **Beacon Flood Attacks** (1.3k SSIDs)
+* **Deauthentication Attacks** (Adjustable packet rate & channel)
+* **Captive Portals** (Multiple portal templates)
+* **Raw Packet Injection** (Send custom 802.11 frames)
+* **Serial-based Command Interface** (CLI over UART)
 
 ---
 
@@ -56,9 +57,11 @@ Open a serial monitor at **115200 baud**:
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                               ANTIFI COMMAND HELP                                ║
 ╠══════════════════════════════════════════════════════════════════════════════════╣
+║ SNIFFING:                                                                        ║
+║   sniff -c <ch || all>        Sniff WiFi on all channels or specific channel     ║
+║                                                                                  ║
 ║ SCANNING:                                                                        ║
-║   scan -t ap                  Scan for WiFi networks (Access Points)             ║
-║   scan -t sta                 Scan for WiFi clients (Stations)                   ║
+║   scan -t <ap || sta>         Scan for WiFi networks or clients                  ║
 ║                                                                                  ║
 ║ PACKET INJECTION:                                                                ║
 ║   inject<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                           ║
@@ -85,12 +88,14 @@ Open a serial monitor at **115200 baud**:
 ║   status                      Show current system status                         ║
 ║   creds                       Show captured credentials                          ║
 ║   clear                       Clear all credentials and senders                  ║
-║   help / ?                    Show this help menu                                ║
+║   version / v                 Show firmware version                              ║
+║   help / ?                    Show help menu                                     ║
 ║                                                                                  ║
 ║ NOTES:                                                                           ║
 ║   • Use '' for empty password (two single quotes)                                ║
 ║   • Packet data must be in hex format (e.g., 08 00 27 AA BB CC)                  ║
 ║   • Sender names must be 'send' followed by a number (e.g., send1, send2)        ║
+║   • Sniffer output is a pcapng format                                            ║
 ║   • Maximum packet size: 512 bytes                                               ║
 ║                                                                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
