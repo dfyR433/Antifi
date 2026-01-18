@@ -373,7 +373,7 @@ void processCommand(String cmd) {
       int ch = arg.toInt();
       sniffer.start((uint8_t)ch);
     }
-    
+
     showPrompt = false;
   }
   // ====== SCAN AP ======
@@ -539,7 +539,6 @@ void setup() {
   }
   inputBuffer.reserve(64);
   setScanDuration(6000000);
-  sniffer.begin();
   showBanner();
   Serial.print(F("antifi> "));  // Initial prompt
 }
