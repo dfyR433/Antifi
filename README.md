@@ -51,7 +51,7 @@ esptool \
 
 ## Commands
 
-Open a serial monitor at **115200 baud**:
+Open a serial monitor at **921600 baud**:
 
 ```text
 ╔══════════════════════════════════════════════════════════════════════════════════╗
