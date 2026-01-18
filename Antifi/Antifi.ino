@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "scan.h"
+#include "sniff.h"
 #include "inject.h"
 #include "beacon.h"
 #include "deauth.h"
@@ -10,10 +11,22 @@
 #include "configs.h"
 
 void stopWifi() {
-  WiFi.softAPdisconnect(true);
-  delay(100);
+  esp_wifi_set_promiscuous(false);
+  vTaskDelay(pdMS_TO_TICKS(50));
+
+  esp_err_t err = esp_wifi_stop();
+  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED) {
+    Serial.printf("wifi_stop failed: %d\n", err);
+  }
+
+  vTaskDelay(pdMS_TO_TICKS(50));
+
+  err = esp_wifi_deinit();
+  if (err != ESP_OK) {
+    Serial.printf("wifi_deinit failed: %d\n", err);
+  }
+
   WiFi.mode(WIFI_OFF);
-  delay(100);
 }
 
 void stopAll() {
@@ -22,6 +35,7 @@ void stopAll() {
   stop_deauth();
   injectorManager.stopAllInjectors();
   portalManager.stopPortal();
+  sniffer.stop();
   stopWifi();
 }
 
@@ -339,6 +353,29 @@ void processCommand(String cmd) {
   else if (lowerCmd == "version" || lowerCmd == "v") {
     Serial.println(version);
   }
+  // ====== SNIFF ======
+  else if (cmd.startsWith("sniff")) {
+    int cpos = cmd.indexOf("-c");
+    if (cpos < 0) {
+      Serial.println("ERROR: missing -c");
+      return;
+    }
+
+    String arg = cmd.substring(cpos + 2);
+    arg.trim();
+
+    Serial.println("Sniffing started");
+    delay(1000);
+
+    if (arg.equalsIgnoreCase("all")) {
+      sniffer.start(0);
+    } else {
+      int ch = arg.toInt();
+      sniffer.start((uint8_t)ch);
+    }
+    
+    showPrompt = false;
+  }
   // ====== SCAN AP ======
   else if (lowerCmd == "scan -t ap") {
     scan_setup("ap");
@@ -491,9 +528,8 @@ void hexStringToBytes(String hexStr, uint8_t* bytes, uint16_t* len) {
 
 // ===== Setup & Loop =====
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD);
   delay(1000);
-
   pinMode(led, OUTPUT);
   for (int i = 0; i < 3; i++) {
     digitalWrite(led, HIGH);
@@ -501,12 +537,9 @@ void setup() {
     digitalWrite(led, LOW);
     delay(200);
   }
-
-  // Reserve space for input buffer to prevent fragmentation
   inputBuffer.reserve(64);
-
   setScanDuration(6000000);
-
+  sniffer.begin();
   showBanner();
   Serial.print(F("antifi> "));  // Initial prompt
 }
@@ -516,6 +549,7 @@ void loop() {
   portalManager.update();
   updatePortalStatus();
   injectorManager.updateInjectors(currentChannel);
+  sniffer.update();
   beacon_loop();
   deauth_loop();
   scan_loop();

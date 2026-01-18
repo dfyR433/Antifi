@@ -5,12 +5,15 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
   return 0;
 }
 
+#define SERIAL_BAUD 921600
+
 // Global instances and variables
+WiFiSniffer sniffer;
 injectorManager injectorManager;
 int currentChannel = 1;
 String inputBuffer = "";
 const int led = 2;
-const char* version = "v1.0";
+const char* version = "v1.1";
 
 typedef struct {
   String ssid;
@@ -28,9 +31,11 @@ void showHelp() {
                    "╔══════════════════════════════════════════════════════════════════════════════════╗\n"
                    "║                               ANTIFI COMMAND HELP                                ║\n"
                    "╠══════════════════════════════════════════════════════════════════════════════════╣\n"
+                   "║ SNIFFING:                                                                        ║\n"
+                   "║   sniff -c <ch || all>        Sniff WiFi on all channels or specific channel     ║\n"
+                   "║                                                                                  ║\n"
                    "║ SCANNING:                                                                        ║\n"
-                   "║   scan -t ap                  Scan for WiFi networks (Access Points)             ║\n"
-                   "║   scan -t sta                 Scan for WiFi clients (Stations)                   ║\n"
+                   "║   scan -t <ap || sta>         Scan for WiFi networks or clients                  ║\n"
                    "║                                                                                  ║\n"
                    "║ PACKET INJECTION:                                                                ║\n"
                    "║   inject<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                           ║\n"
@@ -57,12 +62,14 @@ void showHelp() {
                    "║   status                      Show current system status                         ║\n"
                    "║   creds                       Show captured credentials                          ║\n"
                    "║   clear                       Clear all credentials and senders                  ║\n"
-                   "║   help / ?                    Show this help menu                                ║\n"
+                   "║   help / ?                    Show help menu                                     ║\n"
+                   "║   version / v                 Show firmware version                              ║\n"
                    "║                                                                                  ║\n"
                    "║ NOTES:                                                                           ║\n"
                    "║   • Use '' for empty password (two single quotes)                                ║\n"
                    "║   • Packet data must be in hex format (e.g., 08 00 27 AA BB CC)                  ║\n"
                    "║   • Sender names must be 'send' followed by a number (e.g., send1, send2)        ║\n"
+                   "║   • Sniffer output is a pcapng format                                            ║\n"
                    "║   • Maximum packet size: 512 bytes                                               ║\n"
                    "║                                                                                  ║\n"
                    "╚══════════════════════════════════════════════════════════════════════════════════╝\n"));
