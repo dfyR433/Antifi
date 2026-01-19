@@ -220,12 +220,7 @@ bool WiFiSniffer::start(uint8_t fixedChannel) {
 }
 
 void WiFiSniffer::stop() {
-  if (!isPromiscuous) {
-    return;
-  }
-
   isPromiscuous = false;
-  Serial.println("Sniff stopped");
 }
 
 void WiFiSniffer::promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) {

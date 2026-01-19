@@ -325,11 +325,7 @@ void CaptivePortal::stopPortal() {
   dnsServer.stop();
   delay(100);
 
-  WiFi.softAPdisconnect(true);
-  delay(100);
-
   portalRunning = false;
-  Serial.println("Portal stopped");
 }
 
 void CaptivePortal::update() {

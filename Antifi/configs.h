@@ -13,7 +13,7 @@ injectorManager injectorManager;
 int currentChannel = 1;
 String inputBuffer = "";
 const int led = 2;
-const char* version = "v1.1";
+const char* version = "v1.2";
 
 typedef struct {
   String ssid;
@@ -59,7 +59,6 @@ void showHelp() {
                    "║ MANAGEMENT:                                                                      ║\n"
                    "║   stop                        Stop all attacks/portals/scans                     ║\n"
                    "║   stop -p <name|all>          Stop specific sender or all senders                ║\n"
-                   "║   status                      Show current system status                         ║\n"
                    "║   creds                       Show captured credentials                          ║\n"
                    "║   clear                       Clear all credentials and senders                  ║\n"
                    "║   version / v                 Show firmware version                              ║\n"

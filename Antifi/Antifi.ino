@@ -10,33 +10,35 @@
 #include "captive_portal.h"
 #include "configs.h"
 
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "driver/adc.h"
+
 void stopWifi() {
+  // Just stop activity, DO NOT deinit the driver here
   esp_wifi_set_promiscuous(false);
-  vTaskDelay(pdMS_TO_TICKS(50));
+  esp_wifi_stop();
 
-  esp_err_t err = esp_wifi_stop();
-  if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED) {
-    Serial.printf("wifi_stop failed: %d\n", err);
-  }
+  // Do NOT call esp_wifi_deinit() here
+  // Do NOT destroy netifs here
 
-  vTaskDelay(pdMS_TO_TICKS(50));
-
-  err = esp_wifi_deinit();
-  if (err != ESP_OK) {
-    Serial.printf("wifi_deinit failed: %d\n", err);
-  }
-
-  WiFi.mode(WIFI_OFF);
+  adc_power_off();
 }
 
 void stopAll() {
   scan_setup("stop");
-  stop_beacon();
+  sniffer.stop();
+
   stop_deauth();
+  stop_beacon();
   injectorManager.stopAllInjectors();
   portalManager.stopPortal();
-  sniffer.stop();
+
   stopWifi();
+
+  delay(1000);
+
+  Serial.println("Everything stopped");
 }
 
 // ===== Command Handlers =====
@@ -172,31 +174,55 @@ void parseArguments(String command) {
   // Reset config
   config = { "Captive Portal", "", "", "wifi", "open", false };
 
-  // Tokenize command
   command.trim();
-  int argc = 0;
-  char* argv[20];
-  char* token = strtok((char*)command.c_str(), " ");
 
-  while (token != NULL && argc < 20) {
-    argv[argc++] = token;
-    token = strtok(NULL, " ");
+  // --- Tokenize while respecting double quotes ---
+  std::vector<String> tokens;
+  String cur = "";
+  bool inQuotes = false;
+
+  for (size_t i = 0; i < command.length(); ++i) {
+    char c = command.charAt(i);
+    if (c == '"') {
+      // toggle inQuotes, do not include the quote char in token
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (c == ' ' && !inQuotes) {
+      if (cur.length() > 0) {
+        tokens.push_back(cur);
+        cur = "";
+      }
+    } else {
+      cur += c;
+    }
+  }
+  if (cur.length() > 0) tokens.push_back(cur);
+
+  // If first token is the command name (e.g., "captive_portal"), skip it
+  int startIndex = 0;
+  if (tokens.size() > 0) {
+    String first = tokens[0];
+    if (first.equalsIgnoreCase("captive_portal")) startIndex = 1;
   }
 
-  // Parse arguments
-  for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
-      config.ssid = argv[++i];
-    } else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
-      config.mac = argv[++i];
-    } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
-      config.password = argv[++i];
-    } else if (strcmp(argv[i], "-t") == 0 && i + 1 < argc) {
-      config.portalType = argv[++i];
-    } else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
-      config.encryption = argv[++i];
-    } else if (strcmp(argv[i], "-v") == 0) {
+  // Parse arguments from tokens vector
+  for (int i = startIndex; i < (int)tokens.size(); ++i) {
+    String a = tokens[i];
+    if (a == "-s" && i + 1 < (int)tokens.size()) {
+      config.ssid = tokens[++i];        // preserves spaces & case (quotes removed)
+    } else if (a == "-m" && i + 1 < (int)tokens.size()) {
+      config.mac = tokens[++i];
+    } else if (a == "-p" && i + 1 < (int)tokens.size()) {
+      config.password = tokens[++i];
+    } else if (a == "-t" && i + 1 < (int)tokens.size()) {
+      config.portalType = tokens[++i];
+    } else if (a == "-e" && i + 1 < (int)tokens.size()) {
+      config.encryption = tokens[++i];
+    } else if (a == "-v") {
       config.verbose = true;
+    } else {
+      // Unknown token — ignore or log if you wish
     }
   }
 }
@@ -209,38 +235,35 @@ bool setMacAddress(String macStr) {
 
   uint8_t mac[6];
   int values[6];
-
   if (sscanf(macStr.c_str(), "%x:%x:%x:%x:%x:%x",
              &values[0], &values[1], &values[2],
              &values[3], &values[4], &values[5])
       == 6) {
-    for (int i = 0; i < 6; i++) {
-      mac[i] = (uint8_t)values[i];
-    }
+    for (int i = 0; i < 6; i++) mac[i] = (uint8_t)values[i];
 
-    bool success = WiFi.softAPmacAddress(mac) == 0;
+    esp_err_t err = esp_wifi_set_mac(WIFI_IF_AP, mac);
+    bool success = (err == ESP_OK);
 
     if (config.verbose) {
       if (success) {
         Serial.print("MAC address configured: ");
         Serial.println(macStr);
-        uint8_t actualMac[6];
-        WiFi.softAPmacAddress(actualMac);
+        uint8_t actual[6];
+        esp_wifi_get_mac(WIFI_IF_AP, actual);
         char actualMacStr[18];
         snprintf(actualMacStr, sizeof(actualMacStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 actualMac[0], actualMac[1], actualMac[2],
-                 actualMac[3], actualMac[4], actualMac[5]);
+                 actual[0], actual[1], actual[2],
+                 actual[3], actual[4], actual[5]);
         Serial.print("Actual AP MAC: ");
         Serial.println(actualMacStr);
       } else {
-        Serial.println("Warning: MAC address may not have been set due to hardware limitations");
-        Serial.println("Some ESP32 boards don't support custom MAC addresses for AP mode");
+        Serial.println("Warning: Could not set MAC (esp_wifi_set_mac failed)");
       }
     }
     return success;
   }
 
-  Serial.println("Error: Invalid MAC address format. Use XX:XX:XX:XX:XX:XX");
+  Serial.println("Error: Invalid MAC address format.");
   return false;
 }
 
@@ -381,7 +404,7 @@ void processCommand(String cmd) {
     String scanType = lowerCmd.substring(8);
     if (scanType == "ap" || scanType == "sta") {
       scan_setup(scanType.c_str());
-     showPrompt = false;
+      showPrompt = false;
     }
   }
   // ====== INJECT ======
@@ -506,20 +529,27 @@ void updatePortalStatus() {
 }
 
 void hexStringToBytes(String hexStr, uint8_t* bytes, uint16_t* len) {
-  // Remove all spaces from hex string
   hexStr.replace(" ", "");
+  hexStr.trim();
 
-  // Ensure string has even length
+  // validate characters
+  for (size_t i = 0; i < hexStr.length(); ++i) {
+    char c = hexStr.charAt(i);
+    if (!isxdigit(c)) {
+      *len = 0;
+      return;
+    }
+  }
+
   if (hexStr.length() % 2 != 0) {
     *len = 0;
     return;
   }
 
   *len = hexStr.length() / 2;
-
   for (uint16_t i = 0; i < *len; i++) {
-    String byteStr = hexStr.substring(i * 2, i * 2 + 2);
-    bytes[i] = (uint8_t)strtol(byteStr.c_str(), NULL, 16);
+    String b = hexStr.substring(i * 2, i * 2 + 2);
+    bytes[i] = (uint8_t)strtol(b.c_str(), NULL, 16);
   }
 }
 

@@ -463,7 +463,7 @@ void beacon_loop() {
 
   unsigned long current_time = millis();
 
-  if (current_time - last_packet_time >= 4) {
+  if (current_time - last_packet_time >= 2) {
     send_beacon(ssid_index);
     ssid_index = (ssid_index + 1) % NUM_SSIDS;
     last_packet_time = current_time;
@@ -492,8 +492,6 @@ void beacon_loop() {
 
 void stop_beacon() {
   beacon_active = false;
-
-  Serial.println("Beacon stopped");
 }
 
 bool is_beacon_active() {

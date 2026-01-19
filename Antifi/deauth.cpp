@@ -85,5 +85,4 @@ void deauth_loop() {
 
 void stop_deauth() {
   deauth_active = false;
-  Serial.println("Deauth stopped");
 }

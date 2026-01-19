@@ -1849,7 +1849,6 @@ bool scan_setup(String mode) {
   } else if (mode == "stop") {
     scan.active_ap = false;
     scan.active_sta = false;
-    Serial.println("Scan stopped");
     return true;
   }
   return false;

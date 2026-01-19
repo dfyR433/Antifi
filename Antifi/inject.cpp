@@ -116,8 +116,6 @@ void injectorManager::stopAllInjectors() {
       injectors[i].active = false;
     }
   }
-
-  Serial.println("Injectors Stopped");
 }
 
 void injectorManager::updateInjectors(int& currentChannel) {
