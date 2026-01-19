@@ -376,15 +376,13 @@ void processCommand(String cmd) {
 
     showPrompt = false;
   }
-  // ====== SCAN AP ======
-  else if (lowerCmd == "scan -t ap") {
-    scan_setup("ap");
-    showPrompt = false;
-  }
-  // ====== SCAN STA ======
-  else if (lowerCmd == "scan -t sta") {
-    scan_setup("sta");
-    showPrompt = false;
+  // ====== SCAN ======
+  else if (lowerCmd.startsWith("scan -t ")) {
+    String scanType = lowerCmd.substring(8);
+    if (scanType == "ap" || scanType == "sta") {
+      scan_setup(scanType.c_str());
+     showPrompt = false;
+    }
   }
   // ====== INJECT ======
   else if (lowerCmd.startsWith("inject")) {
@@ -483,7 +481,6 @@ void handleSerialInput() {
       }
     } else if (c >= 32 && c <= 126) {  // printable characters
       inputBuffer += c;
-      Serial.print(c);
     }
   }
 }
