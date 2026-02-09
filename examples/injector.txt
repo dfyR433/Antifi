@@ -1,0 +1,21 @@
+Management frames
+
+Beacon: inject0 -i 80 00 00 00 AA AA AA AA AA AA BB BB BB BB BB BB AA AA AA AA AA AA 10 00 11 22 33 44 55 66 77 88 64 00 01 04 00 00 -ch 6 -pps 5 -m non
+Probe Request: inject1 -i 40 00 00 00 FF FF FF FF FF FF CC CC CC CC CC CC FF FF FF FF FF FF 20 00 00 00 01 08 82 84 8B 96 24 30 48 6C -ch 1 -pps 20 -m 1000
+Probe Response: inject2 -i 50 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 30 00 11 22 33 44 55 66 77 88 64 00 01 04 -ch 11 -pps 2 -m 50
+Authentication: inject3 -i B0 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 40 00 00 00 01 00 00 00 -ch 3 -pps 1 -m 20
+Association Request: inject4 -i 00 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 50 00 01 04 0A 00 01 08 82 84 8B 96 24 30 48 6C -ch 9 -pps 1 -m 3
+Deauthentication: inject5 -i C0 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 60 00 03 00 -ch 6 -pps 1 -m 2
+
+Control frames
+
+ACK: inject6 -i D4 00 00 00 AA AA AA AA AA AA -ch 6 -pps 10 -m 20
+RTS: inject7 -i B4 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC -ch 7 -pps 5 -m 10
+CTS: inject8 -i C4 00 00 00 AA AA AA AA AA AA -ch 7 -pps 5 -m non
+
+Data frames
+
+Data: inject9 -i 08 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 70 00 AA BB CC DD EE FF 08 00 -ch 6 -pps 20 -m 15
+QoS Data: inject10 -i 88 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 80 00 00 00 AA BB CC DD -ch 12 -pps 29 -m 100
+Null Data: inject11 -i 48 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 90 00 -ch 8 -pps 5 -m 5
+EAPOL: inject13 -i 08 02 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA A0 00 AA AA 03 00 00 00 88 8E 01 03 00 30 02 00 10 00 00 00 00 00 00 00 00 00 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 -ch 4 -pps 1 -m 9
