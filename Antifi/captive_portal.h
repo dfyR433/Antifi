@@ -4,9 +4,7 @@
 #include <WiFi.h>
 #include <DNSServer.h>
 #include <WebServer.h>
-#include <Update.h>
-#include "esp_wifi.h"
-#include "Preferences.h"
+#include <Preferences.h>
 
 class CaptivePortal {
 private:
@@ -51,6 +49,7 @@ private:
   Credential capturedCredentials[50];
   int credentialCount;
 
+  // Private method declarations
   String generateClientId();
   String getTimestamp();
   String getClientIP();
@@ -76,17 +75,16 @@ public:
   void stopPortal();
   void update();
   bool isRunning();
+  void printStatus();
   void printCredentials();
   void clearCredentials();
   String getSSID();
   String getPortalType();
   unsigned long getCredentialsCaptured();
   int getClientCount();
-  String getAPIP();
-  String getAPMAC();
-  void setRedirectURL(const String& url);
 };
 
+// Global instance
 extern CaptivePortal portalManager;
 
 #endif

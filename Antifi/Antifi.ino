@@ -1,7 +1,4 @@
-#include <cstdio>
-#include <cstdlib>
-#include <vector>
-
+#include "driver/adc.h"
 #include "scan.h"
 #include "sniff.h"
 #include "inject.h"
@@ -9,10 +6,6 @@
 #include "deauth.h"
 #include "captive_portal.h"
 #include "configs.h"
-
-#include "esp_wifi.h"
-#include "esp_netif.h"
-#include "driver/adc.h"
 
 void stopWifi() {
   // Just stop activity, DO NOT deinit the driver here
@@ -50,8 +43,8 @@ void handleDeauthCommand(String cmd) {
   int parsed = sscanf(cmd.c_str(), "deauth -s %17s -t %17s -c %d -p %d", srcMac, tgtMac, &channel, &pps);
 
   if (parsed == 4) {
-    if (channel < 1 || channel > 13) {
-      Serial.println(F("Error: Channel must be between 1 and 13"));
+    if (channel < 1 || channel > 14) {
+      Serial.println(F("Error: Channel must be between 1 and 14"));
       return;
     }
     deauth_setup(srcMac, tgtMac, channel, pps);
@@ -138,8 +131,8 @@ bool parseInjectCommand(String command, String& injectorName, uint8_t* packetDat
   }
 
   // Validate parameters
-  if (channel < 1 || channel > 13) {
-    Serial.println("Error: Channel must be between 1 and 13");
+  if (channel < 1 || channel > 14) {
+    Serial.println("Error: Channel must be between 1 and 14");
     return false;
   }
 
@@ -148,8 +141,8 @@ bool parseInjectCommand(String command, String& injectorName, uint8_t* packetDat
     return false;
   }
 
-  if (pps > 2000) {
-    Serial.println("Error: Packet rate > 2000");
+  if (pps > 1000) {
+    Serial.println("Error: Packet rate > 1000");
     return false;
   }
 
@@ -170,186 +163,84 @@ bool parseInjectCommand(String command, String& injectorName, uint8_t* packetDat
   return true;
 }
 
-void parseArguments(String command) {
-  // Reset config
-  config = { "Captive Portal", "", "", "wifi", "open", false };
-
-  command.trim();
-
-  // --- Tokenize while respecting double quotes ---
-  std::vector<String> tokens;
-  String cur = "";
-  bool inQuotes = false;
-
-  for (size_t i = 0; i < command.length(); ++i) {
-    char c = command.charAt(i);
-    if (c == '"') {
-      // toggle inQuotes, do not include the quote char in token
-      inQuotes = !inQuotes;
-      continue;
-    }
-    if (c == ' ' && !inQuotes) {
-      if (cur.length() > 0) {
-        tokens.push_back(cur);
-        cur = "";
-      }
-    } else {
-      cur += c;
-    }
-  }
-  if (cur.length() > 0) tokens.push_back(cur);
-
-  // If first token is the command name (e.g., "captive_portal"), skip it
-  int startIndex = 0;
-  if (tokens.size() > 0) {
-    String first = tokens[0];
-    if (first.equalsIgnoreCase("captive_portal")) startIndex = 1;
-  }
-
-  // Parse arguments from tokens vector
-  for (int i = startIndex; i < (int)tokens.size(); ++i) {
-    String a = tokens[i];
-    if (a == "-s" && i + 1 < (int)tokens.size()) {
-      config.ssid = tokens[++i];        // preserves spaces & case (quotes removed)
-    } else if (a == "-m" && i + 1 < (int)tokens.size()) {
-      config.mac = tokens[++i];
-    } else if (a == "-p" && i + 1 < (int)tokens.size()) {
-      config.password = tokens[++i];
-    } else if (a == "-t" && i + 1 < (int)tokens.size()) {
-      config.portalType = tokens[++i];
-    } else if (a == "-e" && i + 1 < (int)tokens.size()) {
-      config.encryption = tokens[++i];
-    } else if (a == "-v") {
-      config.verbose = true;
-    } else {
-      // Unknown token — ignore or log if you wish
-    }
-  }
-}
-
-bool setMacAddress(String macStr) {
-  if (macStr.length() != 17) {
-    Serial.println("Error: MAC address must be 17 characters (XX:XX:XX:XX:XX:XX)");
-    return false;
-  }
-
-  uint8_t mac[6];
-  int values[6];
-  if (sscanf(macStr.c_str(), "%x:%x:%x:%x:%x:%x",
-             &values[0], &values[1], &values[2],
-             &values[3], &values[4], &values[5])
-      == 6) {
-    for (int i = 0; i < 6; i++) mac[i] = (uint8_t)values[i];
-
-    esp_err_t err = esp_wifi_set_mac(WIFI_IF_AP, mac);
-    bool success = (err == ESP_OK);
-
-    if (config.verbose) {
-      if (success) {
-        Serial.print("MAC address configured: ");
-        Serial.println(macStr);
-        uint8_t actual[6];
-        esp_wifi_get_mac(WIFI_IF_AP, actual);
-        char actualMacStr[18];
-        snprintf(actualMacStr, sizeof(actualMacStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-                 actual[0], actual[1], actual[2],
-                 actual[3], actual[4], actual[5]);
-        Serial.print("Actual AP MAC: ");
-        Serial.println(actualMacStr);
-      } else {
-        Serial.println("Warning: Could not set MAC (esp_wifi_set_mac failed)");
-      }
-    }
-    return success;
-  }
-
-  Serial.println("Error: Invalid MAC address format.");
-  return false;
-}
-
 void handleStartCommand(String command) {
-  parseArguments(command);
+  // Remove "captive_portal" and trim
+  String params = command.substring(14);
+  params.trim();
+
+  // Use stack-allocated strings to avoid heap fragmentation
+  char ssid[33] = { 0 };   // Max SSID length is 32
+  char pass[65] = { 0 };   // Max password length is 64
+  char type[20] = "wifi";  // Default type
+
+  // Parse parameters manually to avoid String operations
+  const char* params_cstr = params.c_str();
+  int firstSpace = params.indexOf(' ');
+
+  if (firstSpace == -1) {
+    Serial.println(F("Error: Missing SSID"));
+    Serial.println(F("Usage: start <SSID> [password] [type]"));
+    return;
+  }
+
+  // Extract SSID
+  strncpy(ssid, params_cstr, min(firstSpace, 32));
+  ssid[32] = '\0';
+
+  // Find next parts
+  int secondSpace = params.indexOf(' ', firstSpace + 1);
+
+  if (secondSpace == -1) {
+    // Only SSID and possibly password
+    if (params.length() > firstSpace + 1) {
+      strncpy(pass, params_cstr + firstSpace + 1, 64);
+      pass[64] = '\0';
+    }
+  } else {
+    // Extract password
+    strncpy(pass, params_cstr + firstSpace + 1, min(secondSpace - firstSpace - 1, 64));
+    pass[64] = '\0';
+
+    // Extract type
+    strncpy(type, params_cstr + secondSpace + 1, 19);
+    type[19] = '\0';
+  }
+
+  // Handle empty password representation
+  if (strcmp(pass, "''") == 0 || strcmp(pass, "\"\"") == 0 || strcmp(pass, "null") == 0) {
+    pass[0] = '\0';
+  }
+
+  // Convert type to lowercase
+  for (char* p = type; *p; ++p) *p = tolower(*p);
 
   // Validate portal type
-  String validTypes[] = { "google", "microsoft", "apple", "facebook", "wifi" };
-  bool validType = false;
-  for (auto& type : validTypes) {
-    if (config.portalType == type) {
-      validType = true;
-      break;
-    }
-  }
-
-  if (!validType) {
-    Serial.println("Error: Invalid portal type. Must be: google, microsoft, apple, facebook, wifi");
+  if (strcmp(type, "wifi") != 0 && strcmp(type, "google") != 0 && strcmp(type, "microsoft") != 0 && strcmp(type, "apple") != 0 && strcmp(type, "facebook") != 0) {
+    Serial.print(F("Invalid portal type: "));
+    Serial.println(type);
+    Serial.println(F("Valid types: wifi, google, microsoft, apple, facebook"));
     return;
   }
 
-  // Validate encryption
-  String validEncryption[] = { "open", "wpa", "wpa2", "wpa3" };
-  bool validEnc = false;
-  for (auto& enc : validEncryption) {
-    if (config.encryption == enc) {
-      validEnc = true;
-      break;
-    }
+  // Validate password length for secured networks
+  if (strlen(pass) > 0 && strlen(pass) < 8) {
+    Serial.println(F("Warning: Password should be at least 8 characters for WPA2"));
+    Serial.println(F("Using open network instead..."));
+    pass[0] = '\0';
   }
 
-  if (!validEnc) {
-    Serial.println("Error: Invalid encryption. Must be: open, wpa, wpa2, wpa3");
-    return;
-  }
+  Serial.println(F("Starting portal with:"));
+  Serial.print(F("  SSID: "));
+  Serial.println(ssid);
+  Serial.print(F("  Password: "));
+  Serial.println(strlen(pass) >= 8 ? "********" : "(open network)");
+  Serial.print(F("  Type: "));
+  Serial.println(type);
 
-  // Validate password length if encryption is not open
-  if (config.encryption != "open" && config.password.length() < 8) {
-    Serial.println("Error: Password must be at least 8 characters for WPA/WPA2/WPA3 encryption");
-    return;
-  }
-
-  // Set MAC address if provided
-  if (config.mac.length() > 0) {
-    setMacAddress(config.mac);
-  }
-
-  // Print configuration
-  if (config.verbose) {
-    Serial.println("\n=== Portal Configuration ===");
-    Serial.print("SSID:        ");
-    Serial.println(config.ssid);
-    Serial.print("Portal Type: ");
-    Serial.println(config.portalType);
-    Serial.print("Encryption:  ");
-    Serial.println(config.encryption);
-    if (config.mac.length() > 0) {
-      Serial.print("MAC:         ");
-      Serial.println(config.mac);
-    }
-    if (config.password.length() > 0) {
-      Serial.print("Password:    ");
-      Serial.println(config.password);
-    }
-    Serial.println("==============================\n");
-  }
-
-  // Stop any running portal
-  if (portalManager.isRunning()) {
-    Serial.println("Stopping existing portal...");
-    portalManager.stopPortal();
-    delay(1000);
-  }
-
-  // Start the portal
-  Serial.println("Starting portal...");
-  bool success = portalManager.startPortal(config.ssid, config.password, config.portalType);
-
-  if (success) {
-    Serial.println("Portal started");
-    Serial.print("  Access via: ");
-    Serial.println(portalManager.getAPIP());
-    Serial.print("  MAC: ");
-    Serial.println(portalManager.getAPMAC());
+  if (portalManager.startPortal(ssid, pass, type)) {
+    Serial.println(F("Portal started successfully!"));
   } else {
-    Serial.println("Failed to start portal!");
+    Serial.println(F("Failed to start portal. Please try again."));
   }
 }
 
@@ -556,16 +447,54 @@ void hexStringToBytes(String hexStr, uint8_t* bytes, uint16_t* len) {
 // ===== Setup & Loop =====
 void setup() {
   Serial.begin(SERIAL_BAUD);
-  delay(1000);
+  delay(3000);
+
   pinMode(led, OUTPUT);
+
+  delay(100);
+
+  // Initialize SPI with custom pins
+  SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+
+  // Initialize SD card
+  if (SD.begin(SD_CS_PIN)) {
+    Serial.println("SD Card initialized!");
+  }
+
+  // Get card type
+  uint8_t cardType = SD.cardType();
+  Serial.print("Card Type: ");
+  if (cardType == CARD_MMC) {
+    Serial.println("MMC");
+  } else if (cardType == CARD_SD) {
+    Serial.println("SDSC");
+  } else if (cardType == CARD_SDHC) {
+    Serial.println("SDHC");
+  } else if (cardType == CARD_NONE) {
+    Serial.println("No SD card detected!");
+  } else {
+    Serial.println("UNKNOWN");
+  }
+
+  // Get card size
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("Card Size: %llu MB\n", cardSize);
+
+  // Get used/total space
+  uint64_t totalBytes = SD.totalBytes() / (1024 * 1024);
+  uint64_t usedBytes = SD.usedBytes() / (1024 * 1024);
+  Serial.printf("Total Space: %llu MB\n", totalBytes);
+  Serial.printf("Used Space: %llu MB\n", usedBytes);
+
   for (int i = 0; i < 3; i++) {
+    delay(200);
     digitalWrite(led, HIGH);
     delay(200);
     digitalWrite(led, LOW);
-    delay(200);
   }
+
   inputBuffer.reserve(64);
-  setScanDuration(6000000);
+
   showBanner();
   Serial.print(F("antifi> "));  // Initial prompt
 }

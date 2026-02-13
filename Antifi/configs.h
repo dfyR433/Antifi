@@ -7,24 +7,19 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
 
 #define SERIAL_BAUD 921600
 
+// SD Card pins
+#define SD_MISO_PIN 19
+#define SD_MOSI_PIN 23
+#define SD_SCK_PIN 18
+#define SD_CS_PIN 5
+
 // Global instances and variables
 WiFiSniffer sniffer;
 injectorManager injectorManager;
 int currentChannel = 1;
 String inputBuffer = "";
 const int led = 2;
-const char* version = "v1.2";
-
-typedef struct {
-  String ssid;
-  String mac;
-  String password;
-  String portalType;
-  String encryption;
-  bool verbose;
-} PortalConfig;
-
-PortalConfig config;
+const char* version = "v1.3";
 
 void showHelp() {
   Serial.println(F("\n"
@@ -39,9 +34,8 @@ void showHelp() {
                    "║                                                                                  ║\n"
                    "║ PACKET INJECTION:                                                                ║\n"
                    "║   inject<i> -i <hex> -ch <ch> -pps <rate> -m <max|non>                           ║\n"
-                   "║     Example: inject0 -i 00 00 00 -ch 6 -pps 100 -m 1000                          ║\n"
                    "║     -i: Packet data in hex (space-separated bytes)                               ║\n"
-                   "║     -ch: Channel 1-13                                                            ║\n"
+                   "║     -ch: Channel 1-14                                                            ║\n"
                    "║     -pps: Packets per second                                                     ║\n"
                    "║     -m: Max packets or 'non' for unlimited                                       ║\n"
                    "║   list_injectors                List all active packet injectors                 ║\n"
@@ -53,7 +47,7 @@ void showHelp() {
                    "║   deauth -s <src mac> -t <tgt mac> -c <channel> -p <packets per second>          ║\n"
                    "║                                                                                  ║\n"
                    "║ CAPTIVE PORTAL:                                                                  ║\n"
-                   "║   captive_portal -s <ssid> -p <pass> -t <type> -m <mac> -e <encryption>          ║\n"
+                   "║   captive_portal <ssid> <pass> <type>                                            ║\n"
                    "║     Types: wifi, google, microsoft, apple, facebook                              ║\n"
                    "║                                                                                  ║\n"
                    "║ MANAGEMENT:                                                                      ║\n"

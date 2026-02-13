@@ -310,8 +310,8 @@ static const VendorOUI vendor_oui_list[] = {
 struct ScanState {
   bool active_ap = false;
   bool active_sta = false;
-  bool enhanced_scanning = false;  // Enable enhanced features
-  bool client_scanning = false;
+  bool enhanced_scanning = true;  // Enable enhanced features
+  bool client_scanning = true;
   int current_channel = 1;
   unsigned long channel_switch_time = 0;
   unsigned long last_display = 0;
@@ -320,18 +320,18 @@ struct ScanState {
   bool mac_filtering_enabled = true;
   bool ssid_tracking_enabled = true;  // Track SSIDs from probe requests
   bool passive_only = true;           // Always passive mode
-  int min_rssi = -90;
-  unsigned long channel_hop_interval = 300;
-  unsigned long scan_duration = 60000;   // 1 minute default
-  uint8_t scan_mode = 0;                 // 0=standard, 1=enhanced, 2=deep
-  bool collect_ssid_stats = true;        // Collect SSID statistics
-  bool probe_sniffing = true;            // Sniff probe requests for hidden APs
-  unsigned long last_probe_check = 0;    // Last time probe cache was checked
-  bool probe_debug = false;              // Debug output for probe requests
-  bool enhanced_client_tracking = true;  // Enhanced client association tracking
-  bool track_client_ssids = true;        // Track SSIDs probed by each client
-  unsigned long last_client_scan = 0;    // Last client scan display
-  int client_scan_interval = 5000;       // Display clients every 5 seconds
+  int min_rssi = -95;
+  unsigned long channel_hop_interval = 500;
+  unsigned long scan_duration = 6000000;  // 100 minutes default
+  uint8_t scan_mode = 0;                  // 0=standard, 1=enhanced, 2=deep
+  bool collect_ssid_stats = true;         // Collect SSID statistics
+  bool probe_sniffing = true;             // Sniff probe requests for hidden APs
+  unsigned long last_probe_check = 0;     // Last time probe cache was checked
+  bool probe_debug = false;               // Debug output for probe requests
+  bool enhanced_client_tracking = true;   // Enhanced client association tracking
+  bool track_client_ssids = true;         // Track SSIDs probed by each client
+  unsigned long last_client_scan = 0;     // Last client scan display
+  int client_scan_interval = 3000;        // Display clients every 5 seconds
 };
 
 // ===== Function Prototypes =====
@@ -377,7 +377,7 @@ bool compareMAC(const mac_address_t& mac1, const uint8_t* mac2);
 // === Encryption Detection ===
 String getEncryptionType(wifi_auth_mode_t encryptionType);
 wifi_auth_mode_t determineEncryptionFromFrame(const uint8_t* frame, uint16_t frame_len);
-String getCompleteEncryptionType(wifi_auth_mode_t encryptionType);
+const char* getCompleteEncryptionType(wifi_auth_mode_t encryptionType);
 
 // === WPS Detection ===
 bool detectWPSInBeacon(const uint8_t* frame, uint16_t frame_len);
@@ -438,11 +438,6 @@ void enableProbeSniffing(bool enable);
 void enableProbeDebug(bool enable);
 void enableEnhancedClientTracking(bool enable);
 void setClientScanInterval(int interval);
-
-// === Debug & Test Functions ===
-void testRevealHiddenAPs();
-void dumpProbeCache();
-void dumpClientAssociations();
 
 // === Utility Functions ===
 int getAPCount();

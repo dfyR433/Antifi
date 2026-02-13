@@ -27,11 +27,11 @@ unsigned long last_client_cleanup = 0;
 unsigned long channel_switch_time = 0;
 
 // ===== Configuration =====
-const int CHANNEL_SWITCH_INTERVAL = 300;
-const int TOTAL_CHANNELS = 13;
-const int MAX_CLIENT_AGE_MS = 30000;
+const int CHANNEL_SWITCH_INTERVAL = 500;
+const int TOTAL_CHANNELS = 14;
+const int MAX_CLIENT_AGE_MS = 5000;
 const int CLIENT_CLEANUP_INTERVAL = 5000;
-const int MINIMUM_RSSI = -90;
+const int MINIMUM_RSSI = -95;
 const int MIN_PACKET_SIZE = 24;
 const int PROBE_CACHE_CHECK_INTERVAL = 1000;
 
@@ -81,31 +81,69 @@ bool compareMAC(const mac_address_t& mac1, const uint8_t* mac2) {
   return memcmp(mac1.data(), mac2, 6) == 0;
 }
 
-// ===== Encryption Detection Functions (Compatible with older ESP32 cores) =====
-String getCompleteEncryptionType(wifi_auth_mode_t encryptionType) {
-  switch (encryptionType) {
-    case WIFI_AUTH_OPEN: return "Open";
-    case WIFI_AUTH_WEP: return "WEP";
-    case WIFI_AUTH_WPA_PSK: return "WPA_PSK";
-    case WIFI_AUTH_WPA2_PSK: return "WPA2_PSK";
-    case WIFI_AUTH_WPA_WPA2_PSK: return "WPA/WPA2";
-    case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2_E";
-#ifdef WIFI_AUTH_WPA3_PSK
-    case WIFI_AUTH_WPA3_PSK: return "WPA3_PSK";
-#endif
+const char* getCompleteEncryptionType(wifi_auth_mode_t auth) {
+  switch (auth) {
+
+    // ===== No encryption =====
+    case WIFI_AUTH_OPEN:
+      return "OPEN";
+
+    // ===== Legacy (broken) =====
+    case WIFI_AUTH_WEP:
+      return "WEP";
+
+    // ===== WPA (deprecated) =====
+    case WIFI_AUTH_WPA_PSK:
+      return "WPA-PSK";
+
+    // ===== WPA2 =====
+    case WIFI_AUTH_WPA2_PSK:
+      return "WPA2-PSK";
+
+    case WIFI_AUTH_WPA2_ENTERPRISE:
+      return "WPA2-ENTERPRISE";
+
+    // ===== Mixed WPA/WPA2 =====
+    case WIFI_AUTH_WPA_WPA2_PSK:
+      return "WPA/WPA2-PSK";
+
 #ifdef WIFI_AUTH_WPA2_WPA3_PSK
-    case WIFI_AUTH_WPA2_WPA3_PSK: return "WPA2/WPA3";
+    // ===== Mixed WPA2/WPA3 =====
+    case WIFI_AUTH_WPA2_WPA3_PSK:
+      return "WPA2/WPA3-PSK";
 #endif
-#ifdef WIFI_AUTH_WAPI_PSK
-    case WIFI_AUTH_WAPI_PSK: return "WAPI_PSK";
+
+#ifdef WIFI_AUTH_WPA3_PSK
+    // ===== WPA3 =====
+    case WIFI_AUTH_WPA3_PSK:
+      return "WPA3-PSK";
 #endif
-#ifdef WIFI_AUTH_OWE
-    case WIFI_AUTH_OWE: return "OWE";
-#endif
+
 #ifdef WIFI_AUTH_WPA3_ENTERPRISE
-    case WIFI_AUTH_WPA3_ENTERPRISE: return "WPA3_E";
+    case WIFI_AUTH_WPA3_ENTERPRISE:
+      return "WPA3-ENTERPRISE";
 #endif
-    default: return "Unknown";
+
+#ifdef WIFI_AUTH_OWE
+    // ===== Enhanced Open (OWE) =====
+    case WIFI_AUTH_OWE:
+      return "OWE (Enhanced Open)";
+#endif
+
+#ifdef WIFI_AUTH_WAPI_PSK
+    // ===== WAPI (China) =====
+    case WIFI_AUTH_WAPI_PSK:
+      return "WAPI-PSK";
+#endif
+
+#ifdef WIFI_AUTH_WAPI_CERT
+    case WIFI_AUTH_WAPI_CERT:
+      return "WAPI-CERT";
+#endif
+
+    // ===== Catch-all =====
+    default:
+      return "UNKNOWN";
   }
 }
 
@@ -1576,8 +1614,8 @@ void promiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
 void displayEnhancedAPs() {
   unsigned long current_time = millis();
 
-  // Only display every 2 seconds to prevent serial flooding
-  if (current_time - scan.last_display < 2000 && ap_count > 0) {
+  // Only display every 1 second
+  if (current_time - scan.last_display < 1000 && ap_count > 0) {
     return;
   }
   scan.last_display = current_time;
@@ -1617,7 +1655,7 @@ void displayEnhancedAPs() {
     if (ap.hidden) hidden_count++;
     if (ap.ssid_revealed) hidden_revealed_count++;
 
-    // Limit display to 25 APs at once
+    // Limit display to 50 APs at once
     if (displayed_count >= 50) {
       Serial.println("... more APs not displayed ...");
       break;
@@ -1960,74 +1998,6 @@ void enableEnhancedClientTracking(bool enable) {
 
 void setClientScanInterval(int interval) {
   scan.client_scan_interval = interval;
-}
-
-// ===== Debug & Test Functions =====
-void testRevealHiddenAPs() {
-  Serial.println("\n=== Testing Hidden AP Reveal ===");
-
-  int hidden_count = 0;
-  for (int i = 0; i < ap_count; ++i) {
-    if (aps[i].hidden) {
-      hidden_count++;
-      Serial.printf("Hidden AP %d: BSSID=%s, OrigLen=%d, Channel=%d, RSSI=%d\n",
-                    i + 1,
-                    macToString(aps[i].bssid.data()).c_str(),
-                    aps[i].original_ssid_len,
-                    aps[i].channel,
-                    aps[i].rssi);
-    }
-  }
-
-  Serial.printf("Total Hidden APs: %d\n", hidden_count);
-
-  if (probe_cache.size() > 0) {
-    Serial.println("\nProbe Cache Contents:");
-    for (size_t i = 0; i < probe_cache.size(); i++) {
-      uint8_t target_bssid[6];
-      macToArray(probe_cache[i].target_bssid, target_bssid);
-      String target = isBroadcastMAC(target_bssid) ? "Broadcast" : macToString(target_bssid);
-      Serial.printf("  [%d] Client: %s -> SSID: %s (Len: %d) -> Target: %s\n",
-                    i + 1,
-                    macToString(probe_cache[i].client_mac.data()).c_str(),
-                    probe_cache[i].ssid,
-                    probe_cache[i].ssid_len,
-                    target.c_str());
-    }
-  }
-}
-
-void dumpProbeCache() {
-  Serial.println("\n=== Probe Cache Dump ===");
-  Serial.printf("Total probes: %d\n", probe_cache.size());
-
-  for (size_t i = 0; i < probe_cache.size(); i++) {
-    const ProbeCache& probe = probe_cache[i];
-    uint8_t target_bssid[6];
-    macToArray(probe.target_bssid, target_bssid);
-    String target = isBroadcastMAC(target_bssid) ? "Broadcast" : macToString(target_bssid);
-    Serial.printf("[%d] %s -> %s -> %s (Age: %lu ms)\n",
-                  i + 1,
-                  macToString(probe.client_mac.data()).c_str(),
-                  target.c_str(),
-                  probe.ssid,
-                  millis() - probe.timestamp);
-  }
-}
-
-void dumpClientAssociations() {
-  Serial.println("\n=== Client Associations Dump ===");
-  Serial.printf("Total associations: %d\n", client_associations.size());
-
-  for (size_t i = 0; i < client_associations.size(); i++) {
-    const ClientAssociation& assoc = client_associations[i];
-    Serial.printf("[%d] Client: %s -> AP: %s (Count: %d, Age: %lu ms)\n",
-                  i + 1,
-                  macToString(assoc.client_mac.data()).c_str(),
-                  macToString(assoc.ap_bssid.data()).c_str(),
-                  assoc.association_count,
-                  millis() - assoc.last_associated);
-  }
 }
 
 // ===== Utility Functions =====
