@@ -4,31 +4,50 @@
 
 ## Overview
 
-**AntiFi** is an ESP32-based Wi-Fi penetration testing and security research platform that provides **full low-level control** for **penetration testers, learners, and researchers**.
+**AntiFi** is an **ESP32-based Wi-Fi security research and penetration testing platform** designed to provide **low-level control of IEEE 802.11 behavior** for **education, experimentation, and authorized security assessments**.
+
+The project focuses on transparency, modularity, and hands-on learning, making it suitable for **students, researchers, and security professionals** who want to study Wi-Fi protocols beyond high-level abstractions.
 
 ---
 
 ## Features
 
-* **Wi‑Fi Monitoring** (Passive 802.11 frame sniffing with PCAPNG output)
-* **Network Scanning** (APs & clients)
-* **Beacon Flood Attacks** (1.3k SSIDs)
-* **Deauthentication Attacks** (Adjustable packet rate & channel)
-* **Captive Portals** (Multiple portal templates)
-* **Raw Packet Injection** (Send custom 802.11 frames)
-* **Serial-based Command Interface** (CLI over UART)
+* **Wi-Fi Monitoring**
+  Passive capture of IEEE 802.11 frames with export to **PCAPNG** for offline analysis.
+
+* **Network Scanning**
+  Discovery of nearby access points and associated client devices.
+
+* **Beacon Frame Generation**
+  High-volume broadcasting of configurable SSID beacon frames for protocol and resilience testing.
+
+* **Deauthentication**
+  Transmission of deauthentication frames with adjustable channel and packet rate parameters.
+
+* **Captive Portal Framework**
+  Modular captive portal system supporting multiple customizable templates.
+
+* **Raw Packet Injection**
+  Construction and transmission of custom IEEE 802.11 frames at the MAC layer.
+
+* **Serial Command Interface**
+  UART-based CLI for configuration, control, and real-time status monitoring.
+
+* **SD Card Support**
+  External storage for packet captures and monitoring logs.
 
 ---
 
 ## Support
 
-* **Bugs**: GitHub Issues
-* **More Info**: GitHub Wiki
-* **Binaries Installation**: GitHub Releases
+* **Bug Reports & Feature Requests**: GitHub Issues
+* **Documentation & Guides**: GitHub Wiki
+* **Prebuilt Binaries**: GitHub Releases
 
 ---
 
 ## License
 
 **MIT License**
-For **educational and authorized security testing only**.
+
+This project is intended **strictly for educational purposes and authorized security testing**.
