@@ -6,6 +6,8 @@
 #include <WiFi.h>
 #include "esp_wifi.h"
 
+#define MAX_PACKET_LEN 512
+
 struct PacketInjector {
   bool active;
   String name;
@@ -13,7 +15,7 @@ struct PacketInjector {
   uint32_t pps;
   uint32_t maxPackets;
   uint32_t packetCount;
-  uint8_t packetData[512];
+  uint8_t packetData[MAX_PACKET_LEN];
   uint16_t packetLen;
   unsigned long lastSendTime;
   unsigned long startTime;

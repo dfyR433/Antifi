@@ -416,7 +416,6 @@ bool WiFiSniffer::start(uint8_t fixedChannel) {
 void WiFiSniffer::stop() {
   if (!isPromiscuous) return;
   isPromiscuous = false;
-  esp_wifi_set_promiscuous(false);
 #if USE_SD
   closePCAPNGFile();
 #endif
