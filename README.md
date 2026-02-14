@@ -1,7 +1,5 @@
-# AntiFi – Wi-Fi Pentesting Tool
-
 <p align="center">
-  <img src="img/Antifi.png" alt="AntiFi Logo" width="400"/>
+  <img src="img/Antifi.png" alt="AntiFi Logo" width="500"/>
 </p>
 
 ## Overview
@@ -24,9 +22,9 @@
 
 ## Support
 
-* **Issues**: GitHub Issues
-* **Binaries**: GitHub Releases
-* **Source Code**: GitHub Repository
+* **Bugs**: GitHub Issues
+* **More Info**: GitHub Wiki
+* **Binaries Installation**: GitHub Releases
 
 ---
 
