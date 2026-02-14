@@ -6,7 +6,7 @@
 #include <WiFi.h>
 #include "esp_wifi.h"
 
-#define MAX_PACKET_LEN 512
+#define MAX_PACKET_LEN 2346
 
 struct PacketInjector {
   bool active;
