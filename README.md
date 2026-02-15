@@ -4,7 +4,7 @@
 
 ## Overview
 
-**AntiFi** is an **ESP32-based Wi-Fi security research and penetration testing platform** designed to provide **low-level control of IEEE 802.11 behavior** for **education, experimentation, and authorized security assessments**.
+**AntiFi** is an **ESP32-based Wi-Fi security research and penetration testing platform** designed to provide **low-level control of IEEE 802.11 behavior**
 
 The project focuses on transparency, modularity, and hands-on learning, making it suitable for **students, researchers, and security professionals** who want to study Wi-Fi protocols beyond high-level abstractions.
 
@@ -15,20 +15,20 @@ The project focuses on transparency, modularity, and hands-on learning, making i
 * **Wi-Fi Monitoring**
   Passive capture of IEEE 802.11 frames with export to **PCAPNG** for offline analysis.
 
+* **Raw Packet Injection**
+  Construction and transmission of custom IEEE 802.11 frames at the MAC layer.
+
 * **Network Scanning**
   Discovery of nearby access points and associated client devices.
 
-* **Beacon Frame Generation**
+* **Beacon Flood Attack**
   High-volume broadcasting of configurable SSID beacon frames for protocol and resilience testing.
 
-* **Deauthentication**
+* **Deauthentication Attack**
   Transmission of deauthentication frames with adjustable channel and packet rate parameters.
 
 * **Captive Portal Framework**
   Modular captive portal system supporting multiple customizable templates.
-
-* **Raw Packet Injection**
-  Construction and transmission of custom IEEE 802.11 frames at the MAC layer.
 
 * **Serial Command Interface**
   UART-based CLI for configuration, control, and real-time status monitoring.
