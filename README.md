@@ -21,7 +21,7 @@ The project focuses on transparency, modularity, and hands-on learning, making i
 * **Network Scanning**
   Discovery of nearby access points and associated client devices.
 
-* **Beacon Flood Attack**
+* **Beacon Flood**
   High-volume broadcasting of configurable SSID beacon frames for protocol and resilience testing.
 
 * **Deauthentication Attack**
