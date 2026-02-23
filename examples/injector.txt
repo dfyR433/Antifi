@@ -1,21 +1,7 @@
-Management frames
+inject0 -i 80 00 00 00 ff ff ff ff ff ff 12 34 56 78 9a bc 12 34 56 78 9a bc 10 00 00 00 00 00 00 00 00 00 64 00 31 04 00 04 54 65 73 74 01 08 82 84 8b 96 0c 12 18 24 -ch 1 -pps 17 -m non
 
-Beacon: inject0 -i 80 00 00 00 AA AA AA AA AA AA BB BB BB BB BB BB AA AA AA AA AA AA 10 00 11 22 33 44 55 66 77 88 64 00 01 04 00 00 -ch 6 -pps 5 -m non
-Probe Request: inject1 -i 40 00 00 00 FF FF FF FF FF FF CC CC CC CC CC CC FF FF FF FF FF FF 20 00 00 00 01 08 82 84 8B 96 24 30 48 6C -ch 1 -pps 20 -m 1000
-Probe Response: inject2 -i 50 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 30 00 11 22 33 44 55 66 77 88 64 00 01 04 -ch 11 -pps 2 -m 50
-Authentication: inject3 -i B0 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 40 00 00 00 01 00 00 00 -ch 3 -pps 1 -m 20
-Association Request: inject4 -i 00 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 50 00 01 04 0A 00 01 08 82 84 8B 96 24 30 48 6C -ch 9 -pps 1 -m 3
-Deauthentication: inject5 -i C0 00 00 00 CC CC CC CC CC CC AA AA AA AA AA AA AA AA AA AA AA AA 60 00 03 00 -ch 6 -pps 1 -m 2
+inject1 -i 80 00 00 00 ff ff ff ff ff ff de ad be ef 00 01 de ad be ef 00 01 30 00 00 00 00 00 00 00 00 00 64 00 31 04 00 09 47 75 65 73 74 57 69 46 69 01 08 82 84 8b 96 0c 12 18 24 03 01 06 -ch 9 -pps 30 -m non
 
-Control frames
+inject2 -i c0 00 3a 01 ff ff ff ff ff ff 34 b5 58 06 ff 58 34 f5 7e 06 e3 98 00 00 07 00 -ch 25 -pps 10 -m non
 
-ACK: inject6 -i D4 00 00 00 AA AA AA AA AA AA -ch 6 -pps 10 -m 20
-RTS: inject7 -i B4 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC -ch 7 -pps 5 -m 10
-CTS: inject8 -i C4 00 00 00 AA AA AA AA AA AA -ch 7 -pps 5 -m non
-
-Data frames
-
-Data: inject9 -i 08 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 70 00 AA BB CC DD EE FF 08 00 -ch 6 -pps 20 -m 15
-QoS Data: inject10 -i 88 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 80 00 00 00 AA BB CC DD -ch 12 -pps 29 -m 100
-Null Data: inject11 -i 48 00 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA 90 00 -ch 8 -pps 5 -m 5
-EAPOL: inject13 -i 08 02 00 00 AA AA AA AA AA AA CC CC CC CC CC CC AA AA AA AA AA AA A0 00 AA AA 03 00 00 00 88 8E 01 03 00 30 02 00 10 00 00 00 00 00 00 00 00 00 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 -ch 4 -pps 1 -m 9
+inject3 -i 40 00 00 00 ff ff ff ff ff ff aa bb cc dd ee ff ff ff ff ff ff ff 10 00 00 00 01 08 82 84 8b 96 0c 12 18 24 -ch 6 -pps 49 -m non
