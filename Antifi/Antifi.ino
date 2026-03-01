@@ -1,21 +1,37 @@
-#include "driver/adc.h"
-#include "scan.h"
 #include "sniff.h"
 #include "inject.h"
+
+#include "scan.h"
 #include "beacon.h"
 #include "deauth.h"
 #include "captive_portal.h"
+
 #include "configs.h"
 
-void stopWifi() {
-  // Just stop activity, DO NOT deinit the driver here
+void stop_wifi() {
   esp_wifi_set_promiscuous(false);
   esp_wifi_stop();
+}
 
-  // Do NOT call esp_wifi_deinit() here
-  // Do NOT destroy netifs here
+static uint8_t hexCharToNibble(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return 0;
+}
 
-  adc_power_off();
+static int hexStringToBytes(const char *hex, uint8_t *out, size_t maxOut) {
+  size_t len = strlen(hex);
+  if (len % 2 != 0) return -1;  // odd length
+  size_t byteCount = len / 2;
+  if (byteCount > maxOut) byteCount = maxOut;
+
+  for (size_t i = 0; i < byteCount; i++) {
+    uint8_t hi = hexCharToNibble(hex[i * 2]);
+    uint8_t lo = hexCharToNibble(hex[i * 2 + 1]);
+    out[i] = (hi << 4) | lo;
+  }
+  return byteCount;
 }
 
 void stopAll() {
@@ -24,10 +40,10 @@ void stopAll() {
 
   stop_deauth();
   stop_beacon();
-  injectorManager.stopAllInjectors();
+  injectorManager_stopAllInjectors(&mgr);
   portalManager.stopPortal();
 
-  stopWifi();
+  stop_wifi();
 
   delay(1000);
 
@@ -55,114 +71,6 @@ void handleDeauthCommand(String cmd) {
   }
 }
 
-bool parseInjectCommand(String command, String& injectorName, uint8_t* packetData, uint16_t& packetLen, uint8_t& channel, uint32_t& pps, uint32_t& maxPackets) {
-  // Find the space after the injector name
-  int spaceIndex = command.indexOf(' ');
-  if (spaceIndex == -1) {
-    Serial.println("Error: Invalid command format");
-    Serial.println("Usage: inject -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
-    return false;
-  }
-
-  injectorName = command.substring(0, spaceIndex);
-
-  // Verify it's a valid injector name (inject followed by a number)
-  if (!injectorName.startsWith("inject")) {
-    Serial.println("Error: Injector name must start with 'inject'");
-    return false;
-  }
-
-  // Check if there's a number after "inject"
-  String numberPart = injectorName.substring(6);
-  if (numberPart.length() == 0) {
-    Serial.println("Error: Injector name must be 'inject' followed by a number");
-    return false;
-  }
-
-  for (char c : numberPart) {
-    if (!isdigit(c)) {
-      Serial.println("Error: Injector name must be 'inject' followed by a number");
-      return false;
-    }
-  }
-
-  // Now parse the rest of the command
-  String restOfCommand = command.substring(spaceIndex + 1);
-
-  // Check for required parameters
-  if (!restOfCommand.startsWith("-i ")) {
-    Serial.println("Error: Command must start with '-i' after injector name");
-    Serial.println("Usage: " + injectorName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
-    return false;
-  }
-
-  // Find parameter indices
-  int iIndex = 0;  // -i is at position 0 in restOfCommand
-  int chIndex = restOfCommand.indexOf("-ch ");
-  int ppsIndex = restOfCommand.indexOf("-pps ");
-  int mIndex = restOfCommand.indexOf("-m ");
-
-  if (chIndex == -1 || ppsIndex == -1 || mIndex == -1) {
-    Serial.println("Error: Missing required parameters (-ch, -pps, or -m)");
-    Serial.println("Usage: " + injectorName + " -i <frame info> -ch <channel> -pps <packets per second> -m <maximum send packets & \"non\" for no limit>");
-    return false;
-  }
-
-  // Extract packet data (hex string between -i and -ch)
-  String packetDataStr = restOfCommand.substring(3, chIndex);
-  packetDataStr.trim();
-
-  // Extract channel
-  String channelStr = restOfCommand.substring(chIndex + 4, ppsIndex);
-  channelStr.trim();
-  channel = channelStr.toInt();
-
-  // Extract packets per second
-  String ppsStr = restOfCommand.substring(ppsIndex + 5, mIndex);
-  ppsStr.trim();
-  pps = ppsStr.toInt();
-
-  // Extract max packets
-  String maxStr = restOfCommand.substring(mIndex + 3);
-  maxStr.trim();
-  maxPackets = 0;  // 0 means no limit
-  if (maxStr != "non") {
-    maxPackets = maxStr.toInt();
-  }
-
-  // Validate parameters
-  if (channel < 1 || channel > 14) {
-    Serial.println("Error: Channel must be between 1 and 14");
-    return false;
-  }
-
-  if (pps == 0) {
-    Serial.println("Error: Packets per second must be greater than 0");
-    return false;
-  }
-
-  if (pps > 1000) {
-    Serial.println("Error: Packet rate > 1000");
-    return false;
-  }
-
-  // Convert hex string to bytes
-  hexStringToBytes(packetDataStr, packetData, &packetLen);
-
-  if (packetLen == 0) {
-    Serial.println("Error: Invalid packet data format");
-    Serial.println("Make sure hex bytes are space-separated and valid");
-    return false;
-  }
-
-  if (packetLen > 2346) {
-    Serial.println("Error: Packet too large (max 2346 bytes)");
-    return false;
-  }
-
-  return true;
-}
-
 void handleStartCommand(String command) {
   // Remove "captive_portal" and trim
   String params = command.substring(14);
@@ -174,7 +82,7 @@ void handleStartCommand(String command) {
   char type[20] = "wifi";  // Default type
 
   // Parse parameters manually to avoid String operations
-  const char* params_cstr = params.c_str();
+  const char *params_cstr = params.c_str();
   int firstSpace = params.indexOf(' ');
 
   if (firstSpace == -1) {
@@ -212,7 +120,7 @@ void handleStartCommand(String command) {
   }
 
   // Convert type to lowercase
-  for (char* p = type; *p; ++p) *p = tolower(*p);
+  for (char *p = type; *p; ++p) *p = tolower(*p);
 
   // Validate portal type
   if (strcmp(type, "wifi") != 0 && strcmp(type, "google") != 0 && strcmp(type, "microsoft") != 0 && strcmp(type, "apple") != 0 && strcmp(type, "facebook") != 0) {
@@ -242,6 +150,202 @@ void handleStartCommand(String command) {
   } else {
     Serial.println(F("Failed to start portal. Please try again."));
   }
+}
+
+void handleInjectorCommand(String cmd) {
+  // Get command length and allocate a dynamic buffer (heap)
+  size_t cmdLen = cmd.length();
+  char *cmdBuf = (char *)malloc(cmdLen + 1);
+  if (!cmdBuf) {
+    Serial.println("Error: Out of memory for command");
+    return;
+  }
+  cmd.toCharArray(cmdBuf, cmdLen + 1);
+
+  char *savePtr;
+  char *token = strtok_r(cmdBuf, " ", &savePtr);
+  if (!token) {
+    Serial.println("Error: Empty command");
+    free(cmdBuf);
+    return;
+  }
+
+  // First token must be "inject" followed by a name (e.g., inject1)
+  if (strncasecmp(token, "inject", 6) != 0) {
+    Serial.println("Error: Command must start with 'inject'");
+    free(cmdBuf);
+    return;
+  }
+  const char *injectorName = token + 6;  // points to the name part
+  if (*injectorName == '\0') {
+    Serial.println("Error: Missing injector name (e.g., inject1)");
+    free(cmdBuf);
+    return;
+  }
+
+  // --- FIX: Copy the name to a local buffer before freeing cmdBuf ---
+  char nameCopy[MAX_INJECTOR_NAME];
+  strncpy(nameCopy, injectorName, MAX_INJECTOR_NAME - 1);
+  nameCopy[MAX_INJECTOR_NAME - 1] = '\0';
+
+  // Move to next token
+  token = strtok_r(NULL, " ", &savePtr);
+
+  // Packet buffer (size defined by MAX_PACKET_LEN – on stack)
+  uint8_t packetData[MAX_PACKET_LEN];
+  uint16_t packetLen = 0;
+  uint8_t channel = 1;
+  uint32_t pps = 0;
+  uint32_t maxPackets = 0;
+  int8_t txPower = -1;
+  bool has_i = false;
+  bool has_p = false;
+
+  while (token) {
+    if (token[0] != '-') {
+      Serial.print("Unexpected token: ");
+      Serial.println(token);
+      free(cmdBuf);
+      return;
+    }
+
+    // ----- -i : hex data (parsed on the fly) -----
+    if (strcmp(token, "-i") == 0) {
+      token = strtok_r(NULL, " ", &savePtr);
+      if (!token) {
+        Serial.println("Error: -i requires hex data");
+        free(cmdBuf);
+        return;
+      }
+
+      int bytePos = 0;
+      bool highNibble = true;
+      uint8_t currentByte = 0;
+
+      while (token && token[0] != '-') {
+        for (char *c = token; *c; c++) {
+          uint8_t nibble;
+          char ch = *c;
+          if (ch >= '0' && ch <= '9') nibble = ch - '0';
+          else if (ch >= 'a' && ch <= 'f') nibble = ch - 'a' + 10;
+          else if (ch >= 'A' && ch <= 'F') nibble = ch - 'A' + 10;
+          else {
+            Serial.print("Invalid hex character: ");
+            Serial.println(ch);
+            free(cmdBuf);
+            return;
+          }
+
+          if (highNibble) {
+            currentByte = nibble << 4;
+            highNibble = false;
+          } else {
+            currentByte |= nibble;
+            if (bytePos < MAX_PACKET_LEN) {
+              packetData[bytePos++] = currentByte;
+            } else {
+              Serial.println("Error: Packet too long");
+              free(cmdBuf);
+              return;
+            }
+            highNibble = true;
+          }
+        }
+        token = strtok_r(NULL, " ", &savePtr);
+      }
+
+      if (!highNibble) {
+        Serial.println("Error: Hex data has odd length");
+        free(cmdBuf);
+        return;
+      }
+
+      packetLen = bytePos;
+      has_i = true;
+      continue;  // token already points to next option or NULL
+    }
+
+    // ----- -c : channel -----
+    else if (strcmp(token, "-c") == 0) {
+      token = strtok_r(NULL, " ", &savePtr);
+      if (!token) {
+        Serial.println("Error: -c requires a channel number");
+        free(cmdBuf);
+        return;
+      }
+      channel = (uint8_t)atoi(token);
+      if (channel < 1 || channel > 14) channel = 1;
+    }
+
+    // ----- -p : packets per second -----
+    else if (strcmp(token, "-p") == 0) {
+      token = strtok_r(NULL, " ", &savePtr);
+      if (!token) {
+        Serial.println("Error: -p requires a number");
+        free(cmdBuf);
+        return;
+      }
+      pps = atoi(token);
+      if (pps == 0) pps = 1;
+      has_p = true;
+    }
+
+    // ----- -m : max packets or "non" -----
+    else if (strcmp(token, "-m") == 0) {
+      token = strtok_r(NULL, " ", &savePtr);
+      if (!token) {
+        Serial.println("Error: -m requires a value");
+        free(cmdBuf);
+        return;
+      }
+      if (strcmp(token, "non") == 0) {
+        maxPackets = 0;
+      } else {
+        maxPackets = atoi(token);
+      }
+    }
+
+    // ----- -r : tx power (dBm) -----
+    else if (strcmp(token, "-r") == 0) {
+      token = strtok_r(NULL, " ", &savePtr);
+      if (!token) {
+        Serial.println("Error: -r requires a power value in dBm");
+        free(cmdBuf);
+        return;
+      }
+      txPower = (int8_t)atoi(token);
+      if (txPower < 0) txPower = 0;
+      if (txPower > 21) txPower = 21;
+    }
+
+    // ----- unknown option -----
+    else {
+      Serial.print("Unknown option: ");
+      Serial.println(token);
+      free(cmdBuf);
+      return;
+    }
+
+    token = strtok_r(NULL, " ", &savePtr);
+  }
+
+  // Free the dynamic command buffer – we have a local copy of the name
+  free(cmdBuf);
+
+  // Mandatory options
+  if (!has_i) {
+    Serial.println("Error: missing -i (packet hex)");
+    return;
+  }
+  if (!has_p) {
+    Serial.println("Error: missing -p (packets per second)");
+    return;
+  }
+
+  // Start the injector using the local copy of the name
+  injectorManager_startInjector(&mgr, nameCopy, packetData, packetLen,
+                                channel, pps, maxPackets, txPower);
+  Serial.println("Injector started");
 }
 
 void processCommand(String cmd) {
@@ -290,6 +394,10 @@ void processCommand(String cmd) {
 
     showPrompt = false;
   }
+  // ====== INJECT ======
+  else if (lowerCmd.startsWith("inject")) {
+    handleInjectorCommand(lowerCmd);
+  }
   // ====== SCAN ======
   else if (lowerCmd.startsWith("scan -t ")) {
     String scanType = lowerCmd.substring(8);
@@ -297,50 +405,6 @@ void processCommand(String cmd) {
       scan_setup(scanType.c_str());
       showPrompt = false;
     }
-  }
-  // ====== INJECT ======
-  else if (lowerCmd.startsWith("inject")) {
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&cfg);
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_wifi_start();
-
-    String injectorName;
-    uint8_t packetData[MAX_PACKET_LEN];
-    uint16_t packetLen = 0;
-    uint8_t channel = 1;
-    uint32_t pps = 0;
-    uint32_t maxPackets = 0;
-
-    if (!parseInjectCommand(cmd, injectorName,
-                            packetData, packetLen,
-                            channel, pps, maxPackets)) {
-      Serial.println("Error: Invalid inject command syntax");
-      return;
-    }
-
-    // Display packet info before starting
-    Serial.println("\n=== Configuring Injector ===");
-    Serial.println("Name: " + injectorName);
-    Serial.println("Packet length: " + String(packetLen) + " bytes");
-    Serial.println("Channel: " + String(channel));
-    Serial.println("Rate: " + String(pps) + " packets/sec");
-    Serial.println("Max packets: " + (maxPackets == 0 ? "Unlimited" : String(maxPackets)));
-
-    injectorManager.startInjector(
-      injectorName,
-      packetData,
-      packetLen,
-      channel,
-      pps,
-      maxPackets);
-
-    Serial.println("Injector '" + injectorName + "' started successfully");
-    Serial.println("===========================\n");
-  }
-  // ====== LIST INJECTORS ======
-  else if (lowerCmd == "list_injectors") {
-    injectorManager.listInjectors();
   }
   // ====== DEAUTH ======
   else if (lowerCmd.startsWith("deauth")) {
@@ -362,11 +426,27 @@ void processCommand(String cmd) {
   }
   // ====== STOP INJECTOR ======
   else if (lowerCmd.startsWith("stop -p ")) {
-    String injectorName = cmd.substring(8);
-    if (injectorName == "all") {
-      injectorManager.stopAllInjectors();
+    // Tokenize the command to extract target
+    char buffer[128];
+    cmd.toCharArray(buffer, sizeof(buffer));
+    char *saveptr;
+    char *tok = strtok_r(buffer, " ", &saveptr);
+    if (!tok) return;
+    tok = strtok_r(NULL, " ", &saveptr);  // should be "-p"
+    if (!tok || strcmp(tok, "-p") != 0) {
+      Serial.println("Usage: stop -p <all|injectorName>");
+      return;
+    }
+    tok = strtok_r(NULL, " ", &saveptr);  // target
+    if (!tok) {
+      Serial.println("Usage: stop -p <all|injectorName>");
+      return;
+    }
+    if (strcasecmp(tok, "all") == 0) {
+      injectorManager_stopAllInjectors(&mgr);
+      Serial.println("All injectors stopped.");
     } else {
-      injectorManager.stopInjector(injectorName);
+      injectorManager_stopInjector(&mgr, tok);
     }
   }
   // ====== CREDS ======
@@ -376,7 +456,7 @@ void processCommand(String cmd) {
   // ====== CLEAR ======
   else if (lowerCmd == "clear") {
     portalManager.clearCredentials();
-    injectorManager.clearAllInjectors();
+    injectorManager_clearAllInjectors(&mgr);
   }
   // ====== SD CARD INFO ======
   else if (lowerCmd == "sd_info") {
@@ -492,8 +572,8 @@ void processCommand(String cmd) {
 
     // recursive listing function (lambda capturing above flags)
     const int MAX_RECURSION = 10;  // safety
-    std::function<void(const String&, int)> listDir;
-    listDir = [&](const String& dirPath, int depth) {
+    std::function<void(const String &, int)> listDir;
+    listDir = [&](const String &dirPath, int depth) {
       if (depth > MAX_RECURSION) {
         Serial.println(String(depth) + ": Max recursion reached for " + dirPath);
         return;
@@ -658,8 +738,8 @@ void processCommand(String cmd) {
     };
 
     // recursive printer (ASCII tree)
-    std::function<void(const String&, const String&, int)> printTree;
-    printTree = [&](const String& dirPath, const String& prefix, int depth) {
+    std::function<void(const String &, const String &, int)> printTree;
+    printTree = [&](const String &dirPath, const String &prefix, int depth) {
       if (depth > maxDepth) return;
 
       File d = SD.open(dirPath.c_str());
@@ -770,15 +850,15 @@ void processCommand(String cmd) {
     }
 
     // helper: get basename (safeguard if File.name() returns full path)
-    auto basenameOf = [](const String& p) -> String {
+    auto basenameOf = [](const String &p) -> String {
       int i = p.lastIndexOf('/');
       if (i < 0) return p;
       return p.substring(i + 1);
     };
 
     // helper: print or perform delete depending on confirmYes
-    std::function<bool(const String&)> removeRecursive;
-    removeRecursive = [&](const String& p) -> bool {
+    std::function<bool(const String &)> removeRecursive;
+    removeRecursive = [&](const String &p) -> bool {
       File f = SD.open(p.c_str());
       if (!f) {
         Serial.println("Failed to open for delete: " + p);
@@ -945,8 +1025,8 @@ void processCommand(String cmd) {
     };
 
     const int MAX_DEPTH = 10;
-    std::function<uint64_t(const String&, int)> duRec;
-    duRec = [&](const String& p, int depth) -> uint64_t {
+    std::function<uint64_t(const String &, int)> duRec;
+    duRec = [&](const String &p, int depth) -> uint64_t {
       if (depth > MAX_DEPTH) return 0;
       File f = SD.open(p.c_str());
       if (!f) { return 0; }
@@ -1286,7 +1366,7 @@ void processCommand(String cmd) {
     }
 
     // Read into buffer
-    uint8_t* buffer = (uint8_t*)malloc(toRead + 1);
+    uint8_t *buffer = (uint8_t *)malloc(toRead + 1);
     if (!buffer) {
       Serial.println("Out of memory for tail buffer");
       f.close();
@@ -1297,7 +1377,7 @@ void processCommand(String cmd) {
     f.close();
 
     // convert to String and split into lines from end
-    String s = String((char*)buffer);
+    String s = String((char *)buffer);
     free(buffer);
 
     // count lines from the end
@@ -1475,8 +1555,8 @@ void processCommand(String cmd) {
     Serial.println("Searching in: " + path + " (ext: " + ext + ", substr: " + substr + ")");
 
     const int MAX_DEPTH = 12;
-    std::function<void(const String&, int)> finder;
-    finder = [&](const String& p, int depth) {
+    std::function<void(const String &, int)> finder;
+    finder = [&](const String &p, int depth) {
       if (!recursive && depth > 0) return;
       if (depth > MAX_DEPTH) return;
       File d = SD.open(p.c_str());
@@ -1535,7 +1615,6 @@ void processCommand(String cmd) {
   }
 }
 
-// ===== Serial Input Handler =====
 void handleSerialInput() {
   while (Serial.available()) {
     char c = Serial.read();
@@ -1574,31 +1653,6 @@ void updatePortalStatus() {
       Serial.print(" | Captured: ");
       Serial.println(portalManager.getCredentialsCaptured());
     }
-  }
-}
-
-void hexStringToBytes(String hexStr, uint8_t* bytes, uint16_t* len) {
-  hexStr.replace(" ", "");
-  hexStr.trim();
-
-  // validate characters
-  for (size_t i = 0; i < hexStr.length(); ++i) {
-    char c = hexStr.charAt(i);
-    if (!isxdigit(c)) {
-      *len = 0;
-      return;
-    }
-  }
-
-  if (hexStr.length() % 2 != 0) {
-    *len = 0;
-    return;
-  }
-
-  *len = hexStr.length() / 2;
-  for (uint16_t i = 0; i < *len; i++) {
-    String b = hexStr.substring(i * 2, i * 2 + 2);
-    bytes[i] = (uint8_t)strtol(b.c_str(), NULL, 16);
   }
 }
 
@@ -1641,7 +1695,15 @@ void setup() {
     digitalWrite(led, LOW);
   }
 
+  // Initialize injector manager
+  injectorManager_init(&mgr);
+
+  // Initialize sniffer with default hopping parameters
+  sniffer.begin(SNIFF_START_CHANNEL, SNIFF_END_CHANNEL, SNIFF_HOP_INTERVAL_MS);
+
   inputBuffer.reserve(64);
+
+  stop_wifi();
 
   showBanner();
   Serial.print(F("antifi> "));  // Initial prompt
@@ -1651,7 +1713,7 @@ void loop() {
   handleSerialInput();
   portalManager.update();
   updatePortalStatus();
-  injectorManager.updateInjectors(currentChannel);
+  injectorManager_updateInjectors(&mgr, &currentChannel);
   sniffer.update();
   beacon_loop();
   deauth_loop();

@@ -54,6 +54,7 @@ WiFiSniffer::WiFiSniffer()
     hopInterval(SNIFF_HOP_INTERVAL_MS),
     lastHop(0),
     isPromiscuous(false),
+    paused(false),
     epbBuffer(nullptr),
     epbBufferSize(0) {
   instance = this;
@@ -61,28 +62,50 @@ WiFiSniffer::WiFiSniffer()
 
 #if USE_SD
 String WiFiSniffer::generateFileName() {
+  char filename[48];
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     static int counter = 0;
-    char filename[32];
-    snprintf(filename, sizeof(filename), "/sniff_%04d.pcapng", counter++);
-    return String(filename);
+    snprintf(filename, sizeof(filename), "sniff_%04d.pcapng", counter++);
+  } else {
+    strftime(filename, sizeof(filename), "sniff_%Y%m%d_%H%M%S.pcapng", &timeinfo);
   }
-  char filename[32];
-  strftime(filename, sizeof(filename), "/sniff_%Y%m%d_%H%M%S.pcapng", &timeinfo);
-  return String(filename);
+  char fullpath[64];
+  snprintf(fullpath, sizeof(fullpath), "/capture/%s", filename);
+  return String(fullpath);
 }
 
 bool WiFiSniffer::createNewPCAPNGFile() {
   if (pcapngFileOpen) closePCAPNGFile();
-  currentFileName = generateFileName();
-  int counter = 1;
-  while (SD.exists(currentFileName.c_str())) {
-    if (counter > 100) break;
-    char newName[32];
-    snprintf(newName, sizeof(newName), "/sniff_%04d.pcapng", counter++);
-    currentFileName = String(newName);
+
+  // Ensure the /capture directory exists
+  if (!SD.exists("/capture")) {
+    if (!SD.mkdir("/capture")) {
+      return false;
+    }
   }
+
+  currentFileName = generateFileName();
+
+  // If the file already exists, try numbered alternatives
+  if (SD.exists(currentFileName.c_str())) {
+    int counter = 1;
+    while (counter <= 100) {
+      char baseName[32];
+      snprintf(baseName, sizeof(baseName), "sniff_%04d.pcapng", counter);
+      char fullpath[64];
+      snprintf(fullpath, sizeof(fullpath), "/capture/%s", baseName);
+      if (!SD.exists(fullpath)) {
+        currentFileName = String(fullpath);
+        break;
+      }
+      counter++;
+    }
+    if (counter > 100) {
+      return false;
+    }
+  }
+
   return openPCAPNGFile(currentFileName.c_str());
 }
 
@@ -375,7 +398,6 @@ bool WiFiSniffer::start(uint8_t fixedChannel) {
   esp_wifi_set_storage(WIFI_STORAGE_RAM);
   esp_wifi_set_mode(WIFI_MODE_NULL);
   esp_wifi_start();
-  delay(100);
   esp_wifi_set_promiscuous(true);
   esp_wifi_set_promiscuous_rx_cb(&WiFiSniffer::promiscuousCallback);
   isPromiscuous = true;
@@ -399,6 +421,7 @@ bool WiFiSniffer::start(uint8_t fixedChannel) {
     currentChannel = startChannel;
     esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
   }
+  paused = false;
   lastHop = millis();
   // allocate persistent epb buffer
   if (!epbBuffer) {
@@ -413,9 +436,40 @@ bool WiFiSniffer::start(uint8_t fixedChannel) {
   return true;
 }
 
+void WiFiSniffer::resume() {
+  if (!isPromiscuous || !paused) return;   // not running or not paused
+  // Re-enable promiscuous mode
+  esp_wifi_set_promiscuous(true);
+  // Restore channel (in case it was changed externally)
+  if (targetChannel != 0) {
+    // Fixed channel mode
+    esp_wifi_set_channel(targetChannel, WIFI_SECOND_CHAN_NONE);
+  } else {
+    // Hopping mode – set to current channel and reset hop timer
+    esp_wifi_set_channel(currentChannel, WIFI_SECOND_CHAN_NONE);
+    lastHop = millis();   // restart hop interval timing
+  }
+  paused = false;
+}
+
+void WiFiSniffer::pause() {
+  if (!isPromiscuous || paused) return;   // already stopped or paused
+  // Disable promiscuous mode – packets will no longer be received
+  esp_wifi_set_promiscuous(false);
+  paused = true;
+#if USE_SD
+  // Optionally flush the file to ensure all data is written
+  if (pcapngFileOpen && pcapngFile) {
+    pcapngFile.flush();
+  }
+#endif
+}
+
 void WiFiSniffer::stop() {
   if (!isPromiscuous) return;
   isPromiscuous = false;
+  paused = false;
+  esp_wifi_set_promiscuous(false);
 #if USE_SD
   closePCAPNGFile();
 #endif
@@ -439,77 +493,88 @@ static inline uint8_t safe_channel(const wifi_pkt_rx_ctrl_t& rc, uint8_t fallbac
 void WiFiSniffer::processPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
   wifi_promiscuous_pkt_t* p = (wifi_promiscuous_pkt_t*)buf;
   if (!p) return;
+  if (paused) return;
 
-  // Determine length conservatively. Use a larger fallback to avoid truncating beacons.
+  // Get the total packet length as reported by the hardware.
+  // On ESP32 in promiscuous mode, sig_len typically INCLUDES the 4-byte FCS.
   uint32_t len = p->rx_ctrl.sig_len;
   if (len == 0) {
-    const uint32_t FALLBACK_LEN = 2048;  // larger fallback to avoid TLV truncation
+    // Fallback (should not happen)
+    const uint32_t FALLBACK_LEN = 2048;
     len = FALLBACK_LEN;
     if (type == WIFI_PKT_MGMT && len >= 24) len = 24;
   }
-  uint32_t original_len = len;
   uint32_t capture_len = len > SNIFF_MAX_SNAPLEN ? SNIFF_MAX_SNAPLEN : len;
   if (capture_len == 0) return;
 
-  // Build minimal radiotap header into local buffer (then copy into epbBuffer)
-  // Fields: Channel (bit 3), dBm Antenna Signal (bit 5), Antenna (bit 11)
+  // Build radiotap header with FLAGS field (FCS at end)
   uint8_t rt_tmp[64];
   memset(rt_tmp, 0, sizeof(rt_tmp));
   size_t rt_o = 0;
-  rt_tmp[rt_o++] = 0x00;
-  rt_tmp[rt_o++] = 0x00;  // it_version, it_pad
+
+  // Radiotap fixed fields
+  rt_tmp[rt_o++] = 0x00;  // it_version
+  rt_tmp[rt_o++] = 0x00;  // it_pad
   rt_o += 2;              // placeholder for it_len
-  uint32_t present = (1u << 3) | (1u << 5) | (1u << 11);
+
+  // Present flags: FLAGS(1) | CHANNEL(3) | dBm SIGNAL(5) | ANTENNA(11)
+  uint32_t present = (1u << 1) | (1u << 3) | (1u << 5) | (1u << 11);
   rt_tmp[rt_o++] = (uint8_t)(present & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)((present >> 8) & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)((present >> 16) & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)((present >> 24) & 0xFF);
 
-  // Channel: align to 2 bytes
+  // --- FLAGS field (1 byte) ---
+  // Bit 0: FCS at end (1 = FCS present)
+  rt_tmp[rt_o++] = 0x01;
+
+  // --- Pad to 2-byte boundary for channel field ---
   if (rt_o & 1) rt_tmp[rt_o++] = 0x00;
+
+  // --- CHANNEL field (4 bytes) ---
   uint8_t ch = safe_channel(p->rx_ctrl, (uint8_t)currentChannel);
   uint16_t freq = channelToFrequency(ch);
-  uint16_t chan_flags = 0x0080;  // 2.4 GHz
+  uint16_t chan_flags = 0x0080;  // 2.4 GHz spectrum
   if (ch == 14) chan_flags |= 0x0010;
   rt_tmp[rt_o++] = (uint8_t)(freq & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)((freq >> 8) & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)(chan_flags & 0xFF);
   rt_tmp[rt_o++] = (uint8_t)((chan_flags >> 8) & 0xFF);
 
-  // dBm Antenna Signal (1 byte signed)
+  // --- dBm Antenna Signal (1 byte signed) ---
   int8_t dbm = p->rx_ctrl.rssi;
   rt_tmp[rt_o++] = (uint8_t)dbm;
 
-  // Antenna index (if known)
+  // --- Antenna index (1 byte) ---
   uint8_t antenna_idx = 0;
   rt_tmp[rt_o++] = antenna_idx;
 
-  // pad to 4 bytes
+  // --- Pad to 4-byte boundary ---
   while (rt_o & 3) rt_tmp[rt_o++] = 0x00;
 
-  // write it_len
+  // Write the radiotap header length
   uint16_t it_len = (uint16_t)rt_o;
   rt_tmp[2] = (uint8_t)(it_len & 0xFF);
   rt_tmp[3] = (uint8_t)((it_len >> 8) & 0xFF);
 
-  // Sanity: ensure it_len isn't larger than available combined area (protect against programming errors)
+  // Sanity check: ensure it_len isn't too large
   size_t combined_len = (size_t)it_len + (size_t)capture_len;
-  if (it_len == 0 || it_len > 1024 || combined_len == 0) {
-    // fallback: minimal radiotap header (8 bytes) to avoid desync
+  if (it_len == 0 || it_len > 64 || combined_len == 0) {
+    // Fallback to minimal radiotap header (8 bytes) to avoid desync
     it_len = 8;
     rt_tmp[2] = (uint8_t)(it_len & 0xFF);
     rt_tmp[3] = (uint8_t)((it_len >> 8) & 0xFF);
     combined_len = (size_t)it_len + (size_t)capture_len;
   }
 
-  // Use persistent buffer if available
+  // Use persistent buffer if available (for better performance)
   if (epbBuffer && epbBufferSize >= combined_len) {
     memcpy(epbBuffer, rt_tmp, it_len);
     memcpy(epbBuffer + it_len, p->payload, capture_len);
     uint64_t ts_ns = (uint64_t)esp_timer_get_time() * 1000ULL;
     sendEPB(0, ts_ns, epbBuffer, (uint32_t)combined_len, &p->rx_ctrl);
   } else {
-    // transient allocation fallback
+    // Transient allocation fallback
     uint8_t* tmp = (uint8_t*)malloc(combined_len);
     if (!tmp) return;
     memcpy(tmp, rt_tmp, it_len);
@@ -521,7 +586,7 @@ void WiFiSniffer::processPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
 }
 
 void WiFiSniffer::update() {
-  if (!isPromiscuous) return;
+  if (!isPromiscuous || paused) return;
   if (targetChannel != 0) return;
   unsigned long now = millis();
   if (now - lastHop >= hopInterval) {

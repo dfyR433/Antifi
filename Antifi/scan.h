@@ -310,7 +310,7 @@ static const VendorOUI vendor_oui_list[] = {
 struct ScanState {
   bool active_ap = false;
   bool active_sta = false;
-  bool enhanced_scanning = true;  // Enable enhanced features
+  bool enhanced_scanning = false;  // Enable enhanced features
   bool client_scanning = true;
   int current_channel = 1;
   unsigned long channel_switch_time = 0;
@@ -325,13 +325,13 @@ struct ScanState {
   unsigned long scan_duration = 6000000;  // 100 minutes default
   uint8_t scan_mode = 0;                  // 0=standard, 1=enhanced, 2=deep
   bool collect_ssid_stats = true;         // Collect SSID statistics
-  bool probe_sniffing = true;             // Sniff probe requests for hidden APs
+  bool probe_sniffing = false;            // Sniff probe requests for hidden APs
   unsigned long last_probe_check = 0;     // Last time probe cache was checked
   bool probe_debug = false;               // Debug output for probe requests
-  bool enhanced_client_tracking = true;   // Enhanced client association tracking
-  bool track_client_ssids = true;         // Track SSIDs probed by each client
+  bool enhanced_client_tracking = false;  // Enhanced client association tracking
+  bool track_client_ssids = false;        // Track SSIDs probed by each client
   unsigned long last_client_scan = 0;     // Last client scan display
-  int client_scan_interval = 3000;        // Display clients every 5 seconds
+  int client_scan_interval = 3000;        // Display clients every 3 seconds
 };
 
 // ===== Function Prototypes =====

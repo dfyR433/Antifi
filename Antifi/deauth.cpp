@@ -1,4 +1,5 @@
 #include "deauth.h"
+#include "esp_wifi.h"
 
 static bool deauth_wifi_initialized = false;
 
@@ -21,17 +22,13 @@ void macStringToBytes(const char* macStr, uint8_t* bytes) {
 }
 
 void init_raw_wifi() {
-  if (deauth_wifi_initialized) return;
-
-  Serial.println("Initializing WiFi for raw transmission...");
-
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   esp_wifi_init(&cfg);
   esp_wifi_set_storage(WIFI_STORAGE_RAM);
   esp_wifi_set_mode(WIFI_MODE_STA);
+  esp_wifi_set_ps(WIFI_PS_NONE);
   esp_wifi_start();
-  esp_wifi_set_promiscuous(true);
-
+  esp_wifi_set_max_tx_power(84);
   esp_wifi_set_channel(attack_channel, WIFI_SECOND_CHAN_NONE);
 
   deauth_wifi_initialized = true;

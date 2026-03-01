@@ -1,16 +1,7 @@
 #ifndef SNIFF_H
 #define SNIFF_H
 
-/*
-  sniff.h — WiFiSniffer PCAPNG writer (nanosecond timestamps)
-  - Designed for ESP32 (esp_wifi, esp_timer)
-  - Writes PCAPNG to SD and/or Serial as configured
-  - IDB uses if_tsresol = 9 (nanoseconds). sendEPB expects timestamps in nanoseconds.
-*/
-
 #include <Arduino.h>
-#include <WiFi.h>
-#include <cstring>
 #include <SD.h>
 #include <SPI.h>
 #include "esp_wifi.h"
@@ -59,6 +50,8 @@ public:
              uint8_t endChannel = SNIFF_END_CHANNEL,
              uint16_t hopIntervalMs = SNIFF_HOP_INTERVAL_MS);
   bool start(uint8_t fixedChannel = 0);
+  void pause();
+  void resume();
   void stop();
   void update();
 
@@ -69,6 +62,10 @@ public:
 
   void setHopping(bool enable);
   void setHopInterval(uint16_t interval_ms);
+
+  bool isPaused() const {
+    return paused; 
+  }
 
   bool isRunning() const {
     return isPromiscuous;
@@ -125,6 +122,7 @@ private:
   volatile uint32_t hopInterval;
   volatile unsigned long lastHop;
   volatile bool isPromiscuous;
+  volatile bool paused;
 
   // Persistent packet buffer to avoid per-packet malloc
   static constexpr size_t EPB_BUFFER_HEADROOM = 512;  // radiotap + headroom

@@ -4,10 +4,7 @@
 #include <functional>
 #include <vector>
 
-extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
-  return 0;
-}
-
+// SERIAL SETTINGS
 #define SERIAL_BAUD 921600
 
 // SD Card pins
@@ -17,12 +14,12 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
 #define SD_CS_PIN 5
 
 // Global instances and variables
+injectorManager mgr;
 WiFiSniffer sniffer;
-injectorManager injectorManager;
 int currentChannel = 1;
 String inputBuffer = "";
 const int led = 2;
-const char* version = "v1.4";
+const char* version = "v1.5";
 
 void showHelp() {
   Serial.println(F("\n"
@@ -32,16 +29,16 @@ void showHelp() {
                    "║ SNIFFING:                                                                        ║\n"
                    "║   sniff -c <ch || all>        Sniff WiFi on all channels or specific channel     ║\n"
                    "║                                                                                  ║\n"
-                   "║ SCANNING:                                                                        ║\n"
-                   "║   scan -t <ap || sta>         Scan for WiFi networks or clients                  ║\n"
-                   "║                                                                                  ║\n"
                    "║ PACKET INJECTION:                                                                ║\n"
-                   "║   inject -i <hex> -ch <ch> -pps <rate> -m <max|non>                              ║\n"
+                   "║   inject<n> -i <hex> -c <ch> -p <rate> -m <max|non> -r <dbm>                     ║\n"
                    "║     -i: Packet data in hex (space-separated bytes)                               ║\n"
                    "║     -ch: Channel 1-14                                                            ║\n"
-                   "║     -pps: Packets per second                                                     ║\n"
+                   "║     -p: Packets per second                                                       ║\n"
                    "║     -m: Max packets or 'non' for unlimited                                       ║\n"
-                   "║   list_injectors                List all active packet injectors                 ║\n"
+                   "║     -r: Tx power in dBm                                                          ║\n"
+                   "║                                                                                  ║\n"
+                   "║ SCANNING:                                                                        ║\n"
+                   "║   scan -t <ap || sta>         Scan for WiFi networks or clients                  ║\n"
                    "║                                                                                  ║\n"
                    "║ BEACON ATTACK:                                                                   ║\n"
                    "║   beacon -s                    Start beacon spam attack                          ║\n"
@@ -80,15 +77,6 @@ void showHelp() {
                    "║   version / v                 Show firmware version                              ║\n"
                    "║   help / ?                    Show help menu                                     ║\n"
                    "║                                                                                  ║\n"
-                   "║ NOTES:                                                                           ║\n"
-                   "║   • Use '' for empty password (two single quotes)                                ║\n"
-                   "║   • Packet data must be in hex format (e.g., 08 00 27 AA BB CC)                  ║\n"
-                   "║   • Injectors names must be 'inject' followed by a number (e.g., inject0)        ║\n"
-                   "║   • Sniffer output is pcapng format                                              ║\n"
-                   "║   • Maximum packet size: 2346 bytes                                              ║\n"
-                   "║   • SD paths are absolute (start with /)                                         ║\n"
-                   "║   • sd_rm refuses '/' and is dry-run by default for recursive operations         ║\n"
-                   "║   • sd_cat and sd_head/tail cap output to avoid blocking serial for long perids  ║\n"
                    "╚══════════════════════════════════════════════════════════════════════════════════╝\n"));
 }
 

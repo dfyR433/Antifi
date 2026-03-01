@@ -224,19 +224,17 @@ bool CaptivePortal::startPortal(const String& ssid, const String& password, cons
     delay(1000);  // Give time for clean shutdown
   }
 
+  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+  esp_wifi_init(&cfg);
+  esp_wifi_set_storage(WIFI_STORAGE_RAM);
+  esp_wifi_set_mode(WIFI_MODE_STA);
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  esp_wifi_start();
+  esp_wifi_set_max_tx_power(84);
+
   apSSID = ssid;
   apPassword = password;
   portalType = type;
-
-  Serial.println("Initializing access point...");
-
-  // Ensure clean WiFi state
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-  delay(1000);
-
-  WiFi.mode(WIFI_AP);
-  delay(500);
 
   // Use default IP if config fails
   if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
